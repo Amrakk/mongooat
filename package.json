@@ -1,0 +1,21 @@
+{
+    "name": "mongooat",
+    "version": "1.1.0",
+    "description": "None",
+    "main": "build/index.js",
+    "type": "module",
+    "scripts": {
+        "dev": "node index.js",
+        "build": "tsc",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "4mr4kk",
+    "license": "MIT",
+    "dependencies": {
+        "mongodb": "^6.7.0",
+        "zod": "^3.23.8"
+    },
+    "devDependencies": {
+        "typescript": "^5.4.5"
+    }
+}
