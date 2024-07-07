@@ -1,6 +1,6 @@
 {
     "name": "mongooat",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "None",
     "main": "build/index.js",
     "type": "module",

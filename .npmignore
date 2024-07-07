@@ -1,5 +1,6 @@
 notes.txt
+
 .npmignore
 .gitignore
 
-./src
+/src
