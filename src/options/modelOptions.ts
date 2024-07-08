@@ -1,5 +1,4 @@
 import { ZodRawShape } from "zod";
-import { getModelFields } from "../helper/getModelFields.js";
 
 export declare type ModelOptions<ST extends ZodRawShape> = {
     collection: string;

@@ -4,21 +4,25 @@ import mongo, { BSON, Filter, ModifyResult, ObjectId } from "mongodb";
 import { DefaultModelOptions, ModelOptions } from "./options/modelOptions.js";
 
 import DBNotSetError from "./error/dbNotSet.js";
+import { processUndefinedFields } from "./helpers/processUndefindedFields.js";
+
+export type TypeOf<T extends Model<BSON.Document, ZodRawShape>> = T["_type"];
+export type ModelType = Model<BSON.Document, ZodRawShape>;
 
 /**
  * Represents a model that maps to a MongoDB collection and defines the structure of documents within that collection
  * using a Zod schema for validation. This class provides a foundation for creating, reading, updating, and deleting
  * documents in a type-safe manner.
  *
- * @template ModelType - The TypeScript type that represents the shape of documents in the MongoDB collection.
+ * @template Type - The TypeScript type that represents the shape of documents in the MongoDB collection.
  * @template SchemaType - The shape of the schema used for validation, defined using Zod.
  */
-export class Model<ModelType extends BSON.Document, SchemaType extends ZodRawShape> {
+export class Model<Type extends BSON.Document, SchemaType extends ZodRawShape> {
     private _name: string;
     private _schema: ZodObject<SchemaType>;
     private _options: ModelOptions<SchemaType>;
 
-    readonly _type: ModelType = {} as ModelType;
+    readonly _type: Type = {} as Type;
 
     constructor(name: string, schema: ZodObject<SchemaType>, options?: Partial<ModelOptions<SchemaType>>) {
         this._name = name;
@@ -52,14 +56,15 @@ export class Model<ModelType extends BSON.Document, SchemaType extends ZodRawSha
      *
      * @returns The parsed document object.
      */
-    public async parse(data: object): Promise<ModelType>;
-    public async parse(data: object, isPartial: true): Promise<Partial<ModelType>>;
-    public async parse(data: object, isPartial?: true): Promise<ModelType | Partial<ModelType>> {
+    public async parse(data: object): Promise<Type>;
+    public async parse(data: object, isPartial: true): Promise<Partial<Type>>;
+    public async parse(data: object, isPartial?: true): Promise<Type | Partial<Type>> {
+        // TODO: add mask option to only validate and return the masked data
         const schema = isPartial ? this.schema.partial() : this.schema;
         const test = await schema.safeParseAsync(data);
 
         if (!test.success) throw new ValidateError(this.name, test.error.errors);
-        return data as ModelType;
+        return data as Type;
     }
 
     /**
@@ -85,9 +90,9 @@ export class Model<ModelType extends BSON.Document, SchemaType extends ZodRawSha
      * @returns The data object or array of objects with the specified fields hidden.
      */
     // TODO: implements hide inner fields (nested fields)
-    public hideFields(data: ModelType, hiddenFields?: (keyof SchemaType)[]): ModelType;
-    public hideFields(data: ModelType[], hiddenFields?: (keyof SchemaType)[]): ModelType[];
-    public hideFields(data: ModelType | ModelType[], hiddenFields?: (keyof SchemaType)[]): ModelType | ModelType[] {
+    public hideFields(data: Type, hiddenFields?: (keyof SchemaType)[]): Type;
+    public hideFields(data: Type[], hiddenFields?: (keyof SchemaType)[]): Type[];
+    public hideFields(data: Type | Type[], hiddenFields?: (keyof SchemaType)[]): Type | Type[] {
         hiddenFields = hiddenFields ?? this._options.hiddenFields;
         if (hiddenFields.length === 0) return data;
 
@@ -122,29 +127,29 @@ export class MGModel {
     /**
      * Finds documents in the collection associated with the specified model that match the specified filter criteria.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to query.
-     * @param {Filter<MT>} [filter] - Optional filter criteria to apply to the find operation.
+     * @param {ModelType} model - The model representing the MongoDB collection to query.
+     * @param {Filter<T>} [filter] - Optional filter criteria to apply to the find operation.
      * @param {mongo.FindOptions} [options] - Optional settings for the find operation. Learn more at
      *                                        {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html}.
      *
-     * @returns {Promise<MT[]>} A promise that resolves to an array of documents matching the criteria.
+     * @returns {Promise<T[]>} A promise that resolves to an array of documents matching the criteria.
      *
      * @example
      * // Find all user documents in the collection.
      * const users = await mongooat.model.find(UserModel);
      */
-    public async find<MT extends BSON.Document, ST extends ZodRawShape>(model: Model<MT, ST>): Promise<MT[]>;
-    public async find<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+    public async find<T extends TypeOf<MT>, MT extends ModelType>(model: MT): Promise<T[]>;
+    public async find<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
         options?: mongo.FindOptions
-    ): Promise<MT[]>;
-    public async find<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter?: Filter<MT>,
+    ): Promise<T[]>;
+    public async find<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter?: Filter<T>,
         options?: mongo.FindOptions
-    ): Promise<MT[]> {
-        return this._find("find", model, filter, options) as Promise<MT[]>;
+    ): Promise<T[]> {
+        return this._find("find", model, filter, options) as Promise<T[]>;
     }
 
     /**
@@ -162,60 +167,60 @@ export class MGModel {
      * // Find a user document with the specified ID.
      * const user = await mongooat.model.findById(UserModel, new ObjectId("64b175497dc71570edd625d2"));
      */
-    public async findById<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    public async findById<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
         options?: mongo.FindOptions
-    ): Promise<MT | null> {
-        const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<MT>;
+    ): Promise<T | null> {
+        const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<T>;
         return this.findOne(model, _id, options);
     }
 
     /**
      * Finds a document in the collection associated with the specified model by its ID and updates it.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to query.
+     * @param {ModelType} model - The model representing the MongoDB collection to query.
      * @param {string | ObjectId} id - The ID of the document to find and update.
-     * @param {Partial<MT>} update - The update to apply to the document.
+     * @param {Partial<T>} update - The update to apply to the document.
      * @param {mongo.FindOneAndUpdateOptions} [options] - Optional settings for the find and update operation. Learn more at
      *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html}.
      *
-     * @returns {Promise<ModifyResult<MT> | MT | null>} A promise that resolves to the original document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<T> | T | null>} A promise that resolves to the original document or `null` if no document is found.
      *
      * @example
      * // Update a user document with the specified ID and return the original document (before updated).
      * const updatedUser = await mongooat.model.findByIdAndUpdate(UserModel, "64b175497dc71570edd625d2", { name: "John Doe" });
      */
-    public async findByIdAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        update: Partial<MT>,
+        update: Partial<T>,
         options: mongo.FindOneAndUpdateOptions & { includeResultMetadata: true }
-    ): Promise<ModifyResult<MT>>;
-    public async findByIdAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<ModifyResult<T>>;
+    public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        update: Partial<MT>,
+        update: Partial<T>,
         options: mongo.FindOneAndUpdateOptions & { includeResultMetadata: false }
-    ): Promise<MT | null>;
-    public async findByIdAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<T | null>;
+    public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        update: Partial<MT>,
+        update: Partial<T>,
         options: mongo.FindOneAndUpdateOptions
-    ): Promise<MT | null>;
-    public async findByIdAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<T | null>;
+    public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        update: Partial<MT>
-    ): Promise<MT | null>;
-    public async findByIdAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+        update: Partial<T>
+    ): Promise<T | null>;
+    public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        update: Partial<MT>,
+        update: Partial<T>,
         options?: mongo.FindOneAndUpdateOptions
-    ): Promise<ModifyResult<MT> | MT | null> {
-        const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<MT>;
+    ): Promise<ModifyResult<T> | T | null> {
+        const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<T>;
         if (!options) return this.findOneAndUpdate(model, _id, update);
         else return this.findOneAndUpdate(model, _id, update, options);
     }
@@ -223,48 +228,48 @@ export class MGModel {
     /**
      * Finds a document in the collection associated with the specified model by its ID and replaces it.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to query.
+     * @param {ModelType} model - The model representing the MongoDB collection to query.
      * @param {string | ObjectId} id - The ID of the document to find and replace.
-     * @param {MT} replacement - The replacement document.
+     * @param {T} replacement - The replacement document.
      * @param {mongo.FindOneAndReplaceOptions} [options] - Optional settings for the find and replace operation. Learn more at
      *                                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html}.
      *
-     * @returns {Promise<ModifyResult<MT> | MT | null>} A promise that resolves to the original document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<T> | T | null>} A promise that resolves to the original document or `null` if no document is found.
      *
      * @example
      * // Replace a user document with a new one and return the original document (before replaced).
      * const replacedUser = await mongooat.model.findByIdAndReplace(UserModel, "64b175497dc71570edd625d2", { name: "John Doe" });
      */
-    public async findByIdAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        replacement: MT,
+        replacement: T,
         options: mongo.FindOneAndReplaceOptions & { includeResultMetadata: true }
-    ): Promise<ModifyResult<MT>>;
-    public async findByIdAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<ModifyResult<T>>;
+    public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        replacement: MT,
+        replacement: T,
         options: mongo.FindOneAndReplaceOptions & { includeResultMetadata: false }
-    ): Promise<MT | null>;
-    public async findByIdAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<T | null>;
+    public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        replacement: MT,
+        replacement: T,
         options: mongo.FindOneAndReplaceOptions
-    ): Promise<MT | null>;
-    public async findByIdAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<T | null>;
+    public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        replacement: MT
-    ): Promise<MT | null>;
-    public async findByIdAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+        replacement: T
+    ): Promise<T | null>;
+    public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
-        replacement: MT,
+        replacement: T,
         options?: mongo.FindOneAndReplaceOptions
-    ): Promise<ModifyResult<MT> | MT | null> {
-        const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<MT>;
+    ): Promise<ModifyResult<T> | T | null> {
+        const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<T>;
         if (!options) return this.findOneAndReplace(model, _id, replacement);
         else return this.findOneAndReplace(model, _id, replacement, options);
     }
@@ -272,42 +277,42 @@ export class MGModel {
     /**
      * Finds a document in the collection associated with the specified model by its ID and deletes it.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to query.
+     * @param {ModelType} model - The model representing the MongoDB collection to query.
      * @param {string | ObjectId} id - The ID of the document to find and delete.
      * @param {mongo.FindOneAndDeleteOptions} [options] - Optional settings for the find and delete operation. Learn more at
      *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html}.
      *
-     * @returns {Promise<ModifyResult<MT> | MT | null>} A promise that resolves to the deleted document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<T> | T | null>} A promise that resolves to the deleted document or `null` if no document is found.
      *
      * @example
      * // Delete a user document with the specified ID and return the deleted document.
      * const deletedUser = await mongooat.model.findByIdAndDelete(UserModel, "64b175497dc71570edd625d2");
      */
-    public async findByIdAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    public async findByIdAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
         options: mongo.FindOneAndDeleteOptions & { includeResultMetadata: true }
-    ): Promise<ModifyResult<MT>>;
-    public async findByIdAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<ModifyResult<T>>;
+    public async findByIdAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
         options: mongo.FindOneAndDeleteOptions & { includeResultMetadata: false }
-    ): Promise<MT | null>;
-    public async findByIdAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<T | null>;
+    public async findByIdAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
         options: mongo.FindOneAndDeleteOptions
-    ): Promise<MT | null>;
-    public async findByIdAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<T | null>;
+    public async findByIdAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId
-    ): Promise<MT | null>;
-    public async findByIdAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
+    ): Promise<T | null>;
+    public async findByIdAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
         id: string | ObjectId,
         options?: mongo.FindOneAndDeleteOptions
-    ): Promise<ModifyResult<MT> | MT | null> {
-        const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<MT>;
+    ): Promise<ModifyResult<T> | T | null> {
+        const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<T>;
         if (!options) return this.findOneAndDelete(model, _id);
         else return this.findOneAndDelete(model, _id, options);
     }
@@ -315,143 +320,146 @@ export class MGModel {
     /**
      * Finds a document in the collection associated with the specified model that match the specified filter criteria.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to query.
-     * @param {Filter<MT>} [filter] - Optional filter criteria to apply to the find operation.
+     * @param {ModelType} model - The model representing the MongoDB collection to query.
+     * @param {Filter<T>} [filter] - Optional filter criteria to apply to the find operation.
      * @param {mongo.FindOptions} [options] - Optional settings for the find operation. Learn more at
      *                                        {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html}.
      *
-     * @returns {Promise<MT | null>} A promise that resolves to the first document matching the criteria.
+     * @returns {Promise<T | null>} A promise that resolves to the first document matching the criteria.
      *
      * @example
      * // Find a user document with the specified name.
      * const user = await mongooat.model.findOne(UserModel, { name: "John Doe" });
      */
-    public async findOne<MT extends BSON.Document, ST extends ZodRawShape>(model: Model<MT, ST>): Promise<MT | null>;
-    public async findOne<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+    public async findOne<T extends TypeOf<MT>, MT extends ModelType>(model: MT): Promise<T | null>;
+    public async findOne<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
         options?: mongo.FindOptions
-    ): Promise<MT | null>;
-    public async findOne<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter?: Filter<MT>,
+    ): Promise<T | null>;
+    public async findOne<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter?: Filter<T>,
         options?: mongo.FindOptions
-    ): Promise<MT | null> {
-        return this._find("findOne", model, filter, options) as Promise<MT | null>;
+    ): Promise<T | null> {
+        return this._find("findOne", model, filter, options) as Promise<T | null>;
     }
 
     /**
      * Finds a document in the collection associated with the specified model that match the specified filter criteria and updates it.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to update.
-     * @param {Filter<MT>} filter - The filter criteria to locate the document to update.
-     * @param {Partial<MT>} update - The update operations to be applied to the document.
+     * @param {ModelType} model - The model representing the MongoDB collection to update.
+     * @param {Filter<T>} filter - The filter criteria to locate the document to update.
+     * @param {Partial<T>} update - The update operations to be applied to the document.
      * @param {mongo.FindOneAndUpdateOptions} [options] - Options for the `findOneAndUpdate` operation. Learn more at
      *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html}.
      *
-     * @returns {Promise<ModifyResult<MT> | MT | null>} A promise that resolves to the original document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<T> | T | null>} A promise that resolves to the original document or `null` if no document is found.
      *
      * @example
      * // Update a user's age and return the original document (before updated).
      * const user = await mongooat.model.findOneAndUpdate(UserModel, { name: "John Doe" }, { age: 30 });
      */
-    public async findOneAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        update: Partial<MT>,
+    public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        update: Partial<T>,
         options: mongo.FindOneAndUpdateOptions & { includeResultMetadata: true }
-    ): Promise<ModifyResult<MT>>;
-    public async findOneAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        update: Partial<MT>,
+    ): Promise<ModifyResult<T>>;
+    public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        update: Partial<T>,
         options: mongo.FindOneAndUpdateOptions & { includeResultMetadata: false }
-    ): Promise<MT | null>;
-    public async findOneAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        update: Partial<MT>,
+    ): Promise<T | null>;
+    public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        update: Partial<T>,
         options: mongo.FindOneAndUpdateOptions
-    ): Promise<MT | null>;
-    public async findOneAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        update: Partial<MT>
-    ): Promise<MT | null>;
-    public async findOneAndUpdate<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        update: Partial<MT>,
+    ): Promise<T | null>;
+    public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        update: Partial<T>
+    ): Promise<T | null>;
+    public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        update: Partial<T>,
         options?: mongo.FindOneAndUpdateOptions
-    ): Promise<ModifyResult<MT> | MT | null> {
+    ): Promise<ModifyResult<T> | T | null> {
         if (!this._currDb) throw new DBNotSetError();
         await model.parse(update, true);
 
-        const collection = this._currDb.collection<MT>(model.collection);
+        const { set, unset } = processUndefinedFields(update);
+        const updateFilter = { $set: set, $unset: unset };
+
+        const collection = this._currDb.collection<T>(model.collection);
 
         let res;
         if (options) {
             if (options.includeResultMetadata)
                 return collection.findOneAndUpdate(
                     filter,
-                    { $set: update },
+                    updateFilter,
                     options as mongo.FindOneAndUpdateOptions & { includeResultMetadata: true }
                 );
 
-            res = collection.findOneAndUpdate(filter, { $set: update }, options);
-        } else res = collection.findOneAndUpdate(filter, { $set: update });
+            res = collection.findOneAndUpdate(filter, updateFilter, options);
+        } else res = collection.findOneAndUpdate(filter, updateFilter);
 
-        return res.then((doc) => (doc ? (doc as MT) : null));
+        return res.then(async (doc) => (doc ? (doc as T) : null));
     }
 
     /**
      * Finds a document in the collection associated with the specified model that match the specified filter criteria and replaces it.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to update.
-     * @param {Filter<MT>} filter - The filter criteria to locate the document to update.
-     * @param {Partial<MT>} update - The update operations to be applied to the document.
+     * @param {ModelType} model - The model representing the MongoDB collection to update.
+     * @param {Filter<T>} filter - The filter criteria to locate the document to update.
+     * @param {Partial<T>} update - The update operations to be applied to the document.
      * @param {mongo.FindOneAndReplaceOptions} [options] - Options for the `findOneAndReplace` operation. Learn more at
      *                                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html}.
      *
-     * @returns {Promise<ModifyResult<MT> | MT | null>} A promise that resolves to the original document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<T> | T | null>} A promise that resolves to the original document or `null` if no document is found.
      *
      * @example
      * // Replace a user's document with a new one and return the original document (before replaced).
      * const user = await mongooat.model.findOneAndReplace(UserModel, { name: "John Doe" }, { name: "Jane Doe" });
      */
-    public async findOneAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        replacement: MT,
+    public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        replacement: T,
         options: mongo.FindOneAndReplaceOptions & { includeResultMetadata: true }
-    ): Promise<ModifyResult<MT>>;
-    public async findOneAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        replacement: MT,
+    ): Promise<ModifyResult<T>>;
+    public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        replacement: T,
         options: mongo.FindOneAndReplaceOptions & { includeResultMetadata: false }
-    ): Promise<MT | null>;
-    public async findOneAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        replacement: MT,
+    ): Promise<T | null>;
+    public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        replacement: T,
         options: mongo.FindOneAndReplaceOptions
-    ): Promise<MT | null>;
-    public async findOneAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        replacement: MT
-    ): Promise<MT | null>;
-    public async findOneAndReplace<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        replacement: MT,
+    ): Promise<T | null>;
+    public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        replacement: T
+    ): Promise<T | null>;
+    public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        replacement: T,
         options?: mongo.FindOneAndReplaceOptions
-    ): Promise<ModifyResult<MT> | MT | null> {
+    ): Promise<ModifyResult<T> | T | null> {
         if (!this._currDb) throw new DBNotSetError();
-        await model.parse(replacement, true);
+        await model.parse(replacement);
 
-        const collection = this._currDb.collection<MT>(model.collection);
+        const collection = this._currDb.collection<T>(model.collection);
 
         let res;
         if (options) {
@@ -465,50 +473,50 @@ export class MGModel {
             res = collection.findOneAndReplace(filter, replacement, options);
         } else res = collection.findOneAndReplace(filter, replacement);
 
-        return res.then((doc) => (doc ? (doc as MT) : null));
+        return res.then((doc) => (doc ? (doc as T) : null));
     }
 
     /**
      * Finds a document in the collection associated with the specified model that match the specified filter criteria and deletes it.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to update.
-     * @param {Filter<MT>} filter - The filter criteria to locate the document to delete.
+     * @param {ModelType} model - The model representing the MongoDB collection to update.
+     * @param {Filter<T>} filter - The filter criteria to locate the document to delete.
      * @param {mongo.FindOneAndDeleteOptions} [options] - Options for the `findOneAndDelete` operation. Learn more at
      *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html}.
      *
-     * @returns {Promise<ModifyResult<MT> | MT | null>} A promise that resolves to the deleted document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<T> | T | null>} A promise that resolves to the deleted document or `null` if no document is found.
      *
      * @example
      * // Delete a user's document with the specified name and return the deleted document.
      * const user = await mongooat.model.findOneAndDelete(UserModel, { name: "John Doe" });
      */
-    public async findOneAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+    public async findOneAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
         options: mongo.FindOneAndDeleteOptions & { includeResultMetadata: true }
-    ): Promise<ModifyResult<MT>>;
-    public async findOneAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+    ): Promise<ModifyResult<T>>;
+    public async findOneAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
         options: mongo.FindOneAndDeleteOptions & { includeResultMetadata: false }
-    ): Promise<MT | null>;
-    public async findOneAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+    ): Promise<T | null>;
+    public async findOneAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
         options: mongo.FindOneAndDeleteOptions
-    ): Promise<MT | null>;
-    public async findOneAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>
-    ): Promise<MT | null>;
-    public async findOneAndDelete<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+    ): Promise<T | null>;
+    public async findOneAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>
+    ): Promise<T | null>;
+    public async findOneAndDelete<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
         options?: mongo.FindOneAndDeleteOptions
-    ): Promise<ModifyResult<MT> | MT | null> {
+    ): Promise<ModifyResult<T> | T | null> {
         if (!this._currDb) throw new DBNotSetError();
 
-        const collection = this._currDb.collection<MT>(model.collection);
+        const collection = this._currDb.collection<T>(model.collection);
 
         let res;
         if (options) {
@@ -521,58 +529,58 @@ export class MGModel {
             res = collection.findOneAndDelete(filter, options);
         } else res = collection.findOneAndDelete(filter);
 
-        return res.then((doc) => (doc ? (doc as MT) : null));
+        return res.then((doc) => (doc ? (doc as T) : null));
     }
 
-    private async _find<MT extends BSON.Document, ST extends ZodRawShape>(
+    private async _find<T extends TypeOf<MT>, MT extends ModelType>(
         method: "find" | "findOne",
-        model: Model<MT, ST>,
-        filter: Filter<MT> = {},
+        model: MT,
+        filter: Filter<T> = {},
         options?: mongo.FindOptions
-    ): Promise<MT[] | MT | null> {
+    ): Promise<T[] | T | null> {
         if (!this._currDb) throw new DBNotSetError();
 
-        const collection = this._currDb.collection<MT>(model.collection);
+        const collection = this._currDb.collection<T>(model.collection);
 
         if (method === "find")
             return collection
                 .find(filter, options)
                 .toArray()
-                .then((docs) => docs as MT[]);
-        else return collection.findOne(filter, options).then((doc) => doc as MT | null);
+                .then((docs) => docs as T[]);
+        else return collection.findOne(filter, options).then((doc) => doc as T | null);
     }
 
     /**
      * Inserts a single document into the collection associated with the specified model.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to insert into.
-     * @param {MT} data - The document to insert into the collection.
+     * @param {ModelType} model - The model representing the MongoDB collection to insert into.
+     * @param {T} data - The document to insert into the collection.
      * @param {mongo.InsertOneOptions} [options] - Optional settings for the insert operation. Learn more at
      *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/InsertOneOptions.html}.
      *
-     * @returns {Promise<mongo.InsertOneResult<BSON.Document>>} A promise that resolves to the result of the insert operation.
+     * @returns {Promise<mongo.InsertOneResult>} A promise that resolves to the result of the insert operation.
      *
      * @example
      * // Insert a new user document into the collection.
      * const result = await mongooat.model.insertOne(UserModel, { name: "John Doe", age: 30 });
      */
-    public async insertOne<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        data: MT,
+    public async insertOne<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        data: T,
         options?: mongo.InsertOneOptions
-    ): Promise<mongo.InsertOneResult<BSON.Document>> {
-        return this._insert(model, data, options) as Promise<mongo.InsertOneResult<BSON.Document>>;
+    ): Promise<mongo.InsertOneResult> {
+        return this._insert(model, data, options) as Promise<mongo.InsertOneResult>;
     }
 
     /**
      * Inserts multiple documents into the collection associated with the specified model.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to insert into.
-     * @param {MT[]} data - An array of documents to insert into the collection.
+     * @param {ModelType} model - The model representing the MongoDB collection to insert into.
+     * @param {T[]} data - An array of documents to insert into the collection.
      * @param {mongo.BulkWriteOptions} [options] - Optional settings for the bulk write operation. Learn more at
      *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/BulkWriteOptions.html}.
      *
-     * @returns {Promise<mongo.InsertManyResult<BSON.Document>>} A promise that resolves to the result of the insert operation.
+     * @returns {Promise<mongo.InsertManyResult>} A promise that resolves to the result of the insert operation.
      *
      * @example
      * // Insert multiple user documents into the collection.
@@ -581,30 +589,30 @@ export class MGModel {
      *   { name: "Jane Doe", age: 25 }
      * ]);
      */
-    public async insertMany<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        data: MT[],
+    public async insertMany<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        data: T[],
         options?: mongo.BulkWriteOptions
-    ): Promise<mongo.InsertManyResult<BSON.Document>> {
-        return this._insert(model, data, options) as Promise<mongo.InsertManyResult<BSON.Document>>;
+    ): Promise<mongo.InsertManyResult> {
+        return this._insert(model, data, options) as Promise<mongo.InsertManyResult>;
     }
 
-    private async _insert<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        data: MT | MT[],
+    private async _insert<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        data: T | T[],
         options?: mongo.InsertOneOptions | mongo.BulkWriteOptions
-    ): Promise<mongo.InsertOneResult<BSON.Document> | mongo.InsertManyResult<BSON.Document>> {
+    ): Promise<mongo.InsertOneResult | mongo.InsertManyResult> {
         if (!this._currDb) throw new DBNotSetError();
 
         const collection = this._currDb.collection(model.collection);
 
         if (Array.isArray(data)) {
-            data = await Promise.all(data.map((doc) => model.parse(doc)));
+            data = (await Promise.all(data.map((doc) => model.parse(doc)))) as T[];
 
             // TODO: add option to insert fulfilled data and return rejected one using allSettled
             return collection.insertMany(data, options as mongo.BulkWriteOptions);
         } else {
-            data = await model.parse(data);
+            data = (await model.parse(data)) as T;
             return collection.insertOne(data, options as mongo.InsertOneOptions);
         }
     }
@@ -612,9 +620,9 @@ export class MGModel {
     /**
      * Updates a single document in the collection associated with the specified model that matches the given filter criteria.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to update.
-     * @param {Filter<MT>} filter - The filter criteria to locate the document to update.
-     * @param {Partial<MT>} update - The update operations to be applied to the document.
+     * @param {ModelType} model - The model representing the MongoDB collection to update.
+     * @param {Filter<T>} filter - The filter criteria to locate the document to update.
+     * @param {Partial<T>} update - The update operations to be applied to the document.
      * @param {mongo.UpdateOptions} [options] - Optional settings for the update operation. Learn more at
      *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html}.
      *
@@ -624,10 +632,10 @@ export class MGModel {
      * // Update a user's age in the collection.
      * const result = await mongooat.model.updateOne(UserModel, { name: "John Doe" }, { age: 31 });
      */
-    public async updateOne<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        update: Partial<MT>,
+    public async updateOne<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        update: Partial<T>,
         options?: mongo.UpdateOptions
     ): Promise<mongo.UpdateResult> {
         return this._update("updateOne", model, filter, update, options);
@@ -636,9 +644,9 @@ export class MGModel {
     /**
      * Updates multiple documents in the collection associated with the specified model that match the given filter criteria.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to update.
-     * @param {Filter<MT>} filter - The filter criteria to locate the documents to update.
-     * @param {Partial<MT>} update - The update operations to be applied to the documents.
+     * @param {ModelType} model - The model representing the MongoDB collection to update.
+     * @param {Filter<T>} filter - The filter criteria to locate the documents to update.
+     * @param {Partial<T>} update - The update operations to be applied to the documents.
      * @param {mongo.UpdateOptions} [options] - Optional settings for the update operation. Learn more at
      *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html}.
      *
@@ -648,63 +656,65 @@ export class MGModel {
      * // Update the age of multiple users in the collection.
      * const result = await mongooat.model.updateMany(UserModel, { age: { $lt: 30 } }, { age: 30 });
      */
-    public async updateMany<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        update: Partial<MT>,
+    public async updateMany<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        update: Partial<T>,
         options?: mongo.UpdateOptions
     ): Promise<mongo.UpdateResult> {
         return this._update("updateMany", model, filter, update, options);
     }
 
-    private async _update<MT extends BSON.Document, ST extends ZodRawShape>(
+    private async _update<T extends TypeOf<MT>, MT extends ModelType>(
         method: "updateOne" | "updateMany",
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        update: Partial<MT>,
+        model: MT,
+        filter: Filter<T>,
+        update: Partial<T>,
         options?: mongo.UpdateOptions
     ): Promise<mongo.UpdateResult> {
         if (!this._currDb) throw new DBNotSetError();
         await model.parse(update, true);
 
-        const collection = this._currDb.collection<MT>(model.collection);
-        return collection[method](filter, { $set: update }, options);
+        const { set, unset } = processUndefinedFields(update);
+
+        const collection = this._currDb.collection<T>(model.collection);
+        return collection[method](filter, { $set: set, $unset: unset }, options);
     }
 
     /**
      * Replaces a single document in the collection associated with the specified model that matches the given filter criteria.
      * The entire document is replaced with the provided replacement document.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to update.
-     * @param {Filter<MT>} filter - The filter criteria to locate the document to replace.
-     * @param {MT} replacement - The replacement document that will replace the existing document.
+     * @param {ModelType} model - The model representing the MongoDB collection to update.
+     * @param {Filter<T>} filter - The filter criteria to locate the document to replace.
+     * @param {T} replacement - The replacement document that will replace the existing document.
      * @param {mongo.ReplaceOptions} [options] - Optional settings for the replace operation. Learn more at
      *                                           {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/ReplaceOptions.html}.
      *
-     * @returns {Promise<mongo.UpdateResult<MT>>} A promise that resolves to the result of the replace operation.
+     * @returns {Promise<mongo.UpdateResult>} A promise that resolves to the result of the replace operation.
      *
      * @example
      * // Replace a user's document in the collection.
      * const result = await mongooat.model.replaceOne(UserModel, { name: "John Doe" }, { name: "John Doe", age: 31 });
      */
-    public async replaceOne<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
-        replacement: MT,
+    public async replaceOne<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
+        replacement: T,
         options?: mongo.ReplaceOptions
-    ): Promise<mongo.UpdateResult<MT>> {
+    ): Promise<mongo.UpdateResult> {
         if (!this._currDb) throw new DBNotSetError();
         await model.parse(replacement);
 
-        const collection = this._currDb.collection<MT>(model.collection);
-        return collection.replaceOne(filter, replacement, options).then((res) => res as mongo.UpdateResult<MT>);
+        const collection = this._currDb.collection<T>(model.collection);
+        return collection.replaceOne(filter, replacement, options).then((res) => res as mongo.UpdateResult);
     }
 
     /**
      * Deletes a single document in the collection associated with the specified model that matches the given filter criteria.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to delete from.
-     * @param {Filter<MT>} filter - The filter criteria to locate the document to delete.
+     * @param {ModelType} model - The model representing the MongoDB collection to delete from.
+     * @param {Filter<T>} filter - The filter criteria to locate the document to delete.
      * @param {mongo.DeleteOptions} [options] - Optional settings for the delete operation. Learn more at
      *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/DeleteOptions.html}.
      *
@@ -714,9 +724,9 @@ export class MGModel {
      * // Delete a user document from the collection.
      * const result = await mongooat.model.deleteOne(UserModel, { name: "John Doe" });
      */
-    public async deleteOne<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+    public async deleteOne<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
         options?: mongo.DeleteOptions
     ): Promise<mongo.DeleteResult> {
         return this._delete("deleteOne", model, filter, options);
@@ -725,8 +735,8 @@ export class MGModel {
     /**
      * Deletes multiple documents in the collection associated with the specified model that match the given filter criteria.
      *
-     * @param {Model<MT, ST>} model - The model representing the MongoDB collection to delete from.
-     * @param {Filter<MT>} filter - The filter criteria to locate the documents to delete.
+     * @param {ModelType} model - The model representing the MongoDB collection to delete from.
+     * @param {Filter<T>} filter - The filter criteria to locate the documents to delete.
      * @param {mongo.DeleteOptions} [options] - Optional settings for the delete operation. Learn more at
      *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/DeleteOptions.html}.
      *
@@ -736,23 +746,23 @@ export class MGModel {
      * // Delete multiple user documents from the collection.
      * const result = await mongooat.model.deleteMany(UserModel, { age: { $lt: 30 } });
      */
-    public async deleteMany<MT extends BSON.Document, ST extends ZodRawShape>(
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+    public async deleteMany<T extends TypeOf<MT>, MT extends ModelType>(
+        model: MT,
+        filter: Filter<T>,
         options?: mongo.DeleteOneModel
     ): Promise<mongo.DeleteResult> {
         return this._delete("deleteMany", model, filter, options);
     }
 
-    private async _delete<MT extends BSON.Document, ST extends ZodRawShape>(
+    private async _delete<T extends TypeOf<MT>, MT extends ModelType>(
         method: "deleteOne" | "deleteMany",
-        model: Model<MT, ST>,
-        filter: Filter<MT>,
+        model: MT,
+        filter: Filter<T>,
         options?: mongo.DeleteOptions
     ): Promise<mongo.DeleteResult> {
         if (!this._currDb) throw new DBNotSetError();
 
-        const collection = this._currDb.collection<MT>(model.collection);
+        const collection = this._currDb.collection<T>(model.collection);
         return collection[method](filter, options);
     }
 }
