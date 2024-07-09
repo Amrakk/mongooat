@@ -2,12 +2,16 @@ import { ZodObject, ZodRawShape } from "zod";
 import ValidateError from "./error/validate.js";
 import mongo, { BSON, Filter, ModifyResult, ObjectId } from "mongodb";
 import { DefaultModelOptions, ModelOptions } from "./options/modelOptions.js";
+import { processUndefinedFieldsForUpdate, removeUndefinedFields } from "./helpers/processUndefindedFields.js";
 
 import DBNotSetError from "./error/dbNotSet.js";
-import { processUndefinedFields } from "./helpers/processUndefindedFields.js";
 
 export type TypeOf<T extends Model<BSON.Document, ZodRawShape>> = T["_type"];
 export type ModelType = Model<BSON.Document, ZodRawShape>;
+
+// extract type dynamically with half partial principle(every field is optional but if key exists, value must be match with input type)
+// TODO: Fix update data type to be half partial(only if key exists, value must be match with input type)
+export type UpdateFilter<T extends BSON.Document> = {};
 
 /**
  * Represents a model that maps to a MongoDB collection and defines the structure of documents within that collection
@@ -44,8 +48,13 @@ export class Model<Type extends BSON.Document, SchemaType extends ZodRawShape> {
     }
 
     /** A getter for the model's collection. */
-    public get collection() {
+    public get collection(): string {
         return this._options.collection;
+    }
+
+    /** A getter for the model's checkOnGet option. */
+    public get checkOnGet(): boolean {
+        return this._options.checkOnGet;
     }
 
     /**
@@ -64,7 +73,7 @@ export class Model<Type extends BSON.Document, SchemaType extends ZodRawShape> {
         const test = await schema.safeParseAsync(data);
 
         if (!test.success) throw new ValidateError(this.name, test.error.errors);
-        return data as Type;
+        return removeUndefinedFields(data);
     }
 
     /**
@@ -392,7 +401,7 @@ export class MGModel {
         if (!this._currDb) throw new DBNotSetError();
         await model.parse(update, true);
 
-        const { set, unset } = processUndefinedFields(update);
+        const { set, unset } = processUndefinedFieldsForUpdate(update);
         const updateFilter = { $set: set, $unset: unset };
 
         const collection = this._currDb.collection<T>(model.collection);
@@ -457,7 +466,7 @@ export class MGModel {
         options?: mongo.FindOneAndReplaceOptions
     ): Promise<ModifyResult<T> | T | null> {
         if (!this._currDb) throw new DBNotSetError();
-        await model.parse(replacement);
+        replacement = (await model.parse(replacement)) as T;
 
         const collection = this._currDb.collection<T>(model.collection);
 
@@ -541,13 +550,15 @@ export class MGModel {
         if (!this._currDb) throw new DBNotSetError();
 
         const collection = this._currDb.collection<T>(model.collection);
+        const isCheckOnGet = model.checkOnGet;
 
-        if (method === "find")
-            return collection
-                .find(filter, options)
-                .toArray()
-                .then((docs) => docs as T[]);
-        else return collection.findOne(filter, options).then((doc) => doc as T | null);
+        if (method === "find") {
+            const docs = await collection.find(filter, options).toArray();
+            return (isCheckOnGet ? await Promise.all(docs.map((doc) => model.parse(doc))) : docs) as T[];
+        } else {
+            const doc = await collection.findOne(filter, options);
+            return (isCheckOnGet && doc ? await model.parse(doc) : doc) as T | null;
+        }
     }
 
     /**
@@ -675,7 +686,7 @@ export class MGModel {
         if (!this._currDb) throw new DBNotSetError();
         await model.parse(update, true);
 
-        const { set, unset } = processUndefinedFields(update);
+        const { set, unset } = processUndefinedFieldsForUpdate(update);
 
         const collection = this._currDb.collection<T>(model.collection);
         return collection[method](filter, { $set: set, $unset: unset }, options);
@@ -704,10 +715,10 @@ export class MGModel {
         options?: mongo.ReplaceOptions
     ): Promise<mongo.UpdateResult> {
         if (!this._currDb) throw new DBNotSetError();
-        await model.parse(replacement);
+        replacement = (await model.parse(replacement)) as T;
 
         const collection = this._currDb.collection<T>(model.collection);
-        return collection.replaceOne(filter, replacement, options).then((res) => res as mongo.UpdateResult);
+        return collection.replaceOne(filter, replacement, options) as Promise<mongo.UpdateResult>;
     }
 
     /**

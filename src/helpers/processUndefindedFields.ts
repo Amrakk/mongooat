@@ -1,10 +1,11 @@
 import { BSON } from "mongodb";
 
-export function processUndefinedFields<T extends BSON.Document>(data: T) {
+/** Processes undefined fields in a document for MongoDB update operations. */
+export function processUndefinedFieldsForUpdate<T extends BSON.Document>(data: T) {
     let set: Partial<T> = {};
     let unset: Record<string, any> = {};
 
-    const processField = (obj: any, parentKey: string = "", resultSet: any = set) => {
+    const processField = (obj: T, parentKey: string = "", resultSet: any = set) => {
         for (const key in obj) {
             const fullKey = parentKey ? `${parentKey}.${key}` : key;
             if (obj[key] === undefined) {
@@ -25,4 +26,18 @@ export function processUndefinedFields<T extends BSON.Document>(data: T) {
 
     processField(data);
     return { set, unset };
+}
+
+/** Remove undefined fields from a document. */
+export function removeUndefinedFields<T extends BSON.Document>(data: T) {
+    const processField = (obj: T) => {
+        for (const key in data) {
+            if (obj[key] === undefined) delete obj[key];
+            else if (typeof obj[key] === "object" && obj[key] !== null && !Array.isArray(obj[key]))
+                processField(obj[key]);
+        }
+    };
+
+    processField(data);
+    return data;
 }
