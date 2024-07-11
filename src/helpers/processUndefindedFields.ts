@@ -29,7 +29,7 @@ export function processUndefinedFieldsForUpdate<T extends BSON.Document>(data: T
 }
 
 /** Remove undefined fields from a document. */
-export function removeUndefinedFields<T extends BSON.Document>(data: T) {
+export function removeUndefinedFields<T extends BSON.Document>(data: T): T {
     const processField = (obj: T) => {
         for (const key in data) {
             if (obj[key] === undefined) delete obj[key];
