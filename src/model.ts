@@ -1,18 +1,14 @@
-import { ZodObject, ZodRawShape, ZodType } from "zod";
-import ValidateError from "./error/validate.js";
+import { ZodObject, ZodRawShape } from "zod";
 import mongo, { BSON, Filter, ModifyResult, ObjectId } from "mongodb";
+import { generateUpdateSchema } from "./helpers/generateUpdateSchema.js";
 import { DefaultModelOptions, ModelOptions } from "./options/modelOptions.js";
 import { processUndefinedFieldsForUpdate, removeUndefinedFields } from "./helpers/processUndefindedFields.js";
 
 import DBNotSetError from "./error/dbNotSet.js";
-import { generateUpdateSchema } from "./helpers/generateUpdateSchema.js";
+import ValidateError from "./error/validate.js";
+import IdFieldNotAllowedError from "./error/idFieldNotAllowed.js";
 
-export type TypeOf<T extends Model<BSON.Document, ZodRawShape>> = T["_type"];
-export type ModelType = Model<BSON.Document, ZodRawShape>;
-
-// extract type dynamically with half partial principle(every field is optional but if key exists, value must be match with input type)
-// TODO: Fix update data type to be half partial(only if key exists, value must be match with input type and omit "_id" field)
-export type UpdateFilter<T extends BSON.Document> = {};
+import type { TypeOf, ModelType, UpdateType, OmitId } from "./types.js";
 
 /**
  * Represents a model that maps to a MongoDB collection and defines the structure of documents within that collection
@@ -192,7 +188,7 @@ export class MGModel {
      *
      * @param {ModelType} model - The model representing the MongoDB collection to query.
      * @param {string | ObjectId} id - The ID of the document to find and update.
-     * @param {Partial<T>} update - The update to apply to the document.
+     * @param {UpdateType<T>} update - The update to apply to the document.
      * @param {mongo.FindOneAndUpdateOptions} [options] - Optional settings for the `findByIdAndUpdate` operation. Learn more at
      *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html}.
      *
@@ -205,30 +201,30 @@ export class MGModel {
     public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options: mongo.FindOneAndUpdateOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<T>>;
     public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options: mongo.FindOneAndUpdateOptions & { includeResultMetadata: false }
     ): Promise<T | null>;
     public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options: mongo.FindOneAndUpdateOptions
     ): Promise<T | null>;
     public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        update: Partial<T>
+        update: UpdateType<T>
     ): Promise<T | null>;
     public async findByIdAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options?: mongo.FindOneAndUpdateOptions
     ): Promise<ModifyResult<T> | T | null> {
         const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<T>;
@@ -241,7 +237,7 @@ export class MGModel {
      *
      * @param {ModelType} model - The model representing the MongoDB collection to query.
      * @param {string | ObjectId} id - The ID of the document to find and replace.
-     * @param {Omit<T, "_id">} replacement - The replacement document.
+     * @param {OmitId<T>} replacement - The replacement document.
      * @param {mongo.FindOneAndReplaceOptions} [options] - Optional settings for the `findByIdAndReplace` operation. Learn more at
      *                                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html}.
      *
@@ -254,30 +250,30 @@ export class MGModel {
     public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options: mongo.FindOneAndReplaceOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<T>>;
     public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options: mongo.FindOneAndReplaceOptions & { includeResultMetadata: false }
     ): Promise<T | null>;
     public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options: mongo.FindOneAndReplaceOptions
     ): Promise<T | null>;
     public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        replacement: Omit<T, "_id">
+        replacement: OmitId<T>
     ): Promise<T | null>;
     public async findByIdAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         id: string | ObjectId,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options?: mongo.FindOneAndReplaceOptions
     ): Promise<ModifyResult<T> | T | null> {
         const _id = { _id: id instanceof ObjectId ? id : new ObjectId(id) } as Filter<T>;
@@ -361,7 +357,7 @@ export class MGModel {
      *
      * @param {ModelType} model - The model representing the MongoDB collection to update.
      * @param {Filter<T>} filter - The filter criteria to locate the document to update.
-     * @param {Partial<T>} update - The update operations to be applied to the document.
+     * @param {UpdateType<T>} update - The update operations to be applied to the document.
      * @param {mongo.FindOneAndUpdateOptions} [options] - Options for the `findOneAndUpdate` operation. Learn more at
      *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html}.
      *
@@ -374,37 +370,39 @@ export class MGModel {
     public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options: mongo.FindOneAndUpdateOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<T>>;
     public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options: mongo.FindOneAndUpdateOptions & { includeResultMetadata: false }
     ): Promise<T | null>;
     public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options: mongo.FindOneAndUpdateOptions
     ): Promise<T | null>;
     public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        update: Partial<T>
+        update: UpdateType<T>
     ): Promise<T | null>;
     public async findOneAndUpdate<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options?: mongo.FindOneAndUpdateOptions
     ): Promise<ModifyResult<T> | T | null> {
         if (!this._currDb) throw new DBNotSetError();
+        if (Object.keys(update).includes("_id")) throw new IdFieldNotAllowedError();
+
         await model.parse(update, true);
 
         const { set, unset } = processUndefinedFieldsForUpdate(update);
-        const updateFilter = { $set: set, $unset: unset };
+        const updateFilter = { $set: set as Partial<T>, $unset: unset };
 
         const collection = this._currDb.collection<T>(model.collection);
 
@@ -428,7 +426,7 @@ export class MGModel {
      *
      * @param {ModelType} model - The model representing the MongoDB collection to query.
      * @param {Filter<T>} filter - The filter criteria to locate the document to update.
-     * @param {Omit<T, "_id">} replacement - The replacement document.
+     * @param {OmitId<T>} replacement - The replacement document.
      * @param {mongo.FindOneAndReplaceOptions} [options] - Optional settings for the `findOneAndReplace` operation. Learn more at
      *                                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html}.
      *
@@ -441,34 +439,34 @@ export class MGModel {
     public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options: mongo.FindOneAndReplaceOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<T>>;
     public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options: mongo.FindOneAndReplaceOptions & { includeResultMetadata: false }
     ): Promise<T | null>;
     public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options: mongo.FindOneAndReplaceOptions
     ): Promise<T | null>;
     public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        replacement: Omit<T, "_id">
+        replacement: OmitId<T>
     ): Promise<T | null>;
     public async findOneAndReplace<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options?: mongo.FindOneAndReplaceOptions
     ): Promise<ModifyResult<T> | T | null> {
         if (!this._currDb) throw new DBNotSetError();
-        replacement = (await model.parse(replacement)) as Omit<T, "_id">;
+        replacement = (await model.parse(replacement)) as OmitId<T>;
 
         const collection = this._currDb.collection<T>(model.collection);
 
@@ -621,8 +619,6 @@ export class MGModel {
 
         if (Array.isArray(data)) {
             data = (await Promise.all(data.map((doc) => model.parse(doc)))) as T[];
-
-            // TODO: add option to insert fulfilled data and return rejected one using allSettled
             return collection.insertMany(data, options as mongo.BulkWriteOptions);
         } else {
             data = (await model.parse(data)) as T;
@@ -635,7 +631,7 @@ export class MGModel {
      *
      * @param {ModelType} model - The model representing the MongoDB collection to update.
      * @param {Filter<T>} filter - The filter criteria to locate the document to update.
-     * @param {Partial<T>} update - The update operations to be applied to the document.
+     * @param {UpdateType<T>} update - The update operations to be applied to the document.
      * @param {mongo.UpdateOptions} [options] - Optional settings for the update operation. Learn more at
      *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html}.
      *
@@ -648,7 +644,7 @@ export class MGModel {
     public async updateOne<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options?: mongo.UpdateOptions
     ): Promise<mongo.UpdateResult> {
         return this._update("updateOne", model, filter, update, options);
@@ -659,7 +655,7 @@ export class MGModel {
      *
      * @param {ModelType} model - The model representing the MongoDB collection to update.
      * @param {Filter<T>} filter - The filter criteria to locate the documents to update.
-     * @param {Partial<T>} update - The update operations to be applied to the documents.
+     * @param {UpdateType<T>} update - The update operations to be applied to the documents.
      * @param {mongo.UpdateOptions} [options] - Optional settings for the update operation. Learn more at
      *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html}.
      *
@@ -672,7 +668,7 @@ export class MGModel {
     public async updateMany<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options?: mongo.UpdateOptions
     ): Promise<mongo.UpdateResult> {
         return this._update("updateMany", model, filter, update, options);
@@ -682,16 +678,17 @@ export class MGModel {
         method: "updateOne" | "updateMany",
         model: MT,
         filter: Filter<T>,
-        update: Partial<T>,
+        update: UpdateType<T>,
         options?: mongo.UpdateOptions
     ): Promise<mongo.UpdateResult> {
         if (!this._currDb) throw new DBNotSetError();
+        if (Object.keys(update).includes("_id")) throw new IdFieldNotAllowedError();
         await model.parse(update, true);
 
         const { set, unset } = processUndefinedFieldsForUpdate(update);
 
         const collection = this._currDb.collection<T>(model.collection);
-        return collection[method](filter, { $set: set, $unset: unset }, options);
+        return collection[method](filter, { $set: set as Partial<T>, $unset: unset }, options);
     }
 
     /**
@@ -700,7 +697,7 @@ export class MGModel {
      *
      * @param {ModelType} model - The model representing the MongoDB collection to update.
      * @param {Filter<T>} filter - The filter criteria to locate the document to replace.
-     * @param {Omit<T, "_id">} replacement - The replacement document that will replace the existing document.
+     * @param {OmitId<T>} replacement - The replacement document that will replace the existing document.
      * @param {mongo.ReplaceOptions} [options] - Optional settings for the replace operation. Learn more at
      *                                           {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/ReplaceOptions.html}.
      *
@@ -713,11 +710,11 @@ export class MGModel {
     public async replaceOne<T extends TypeOf<MT>, MT extends ModelType>(
         model: MT,
         filter: Filter<T>,
-        replacement: Omit<T, "_id">,
+        replacement: OmitId<T>,
         options?: mongo.ReplaceOptions
     ): Promise<mongo.UpdateResult> {
         if (!this._currDb) throw new DBNotSetError();
-        replacement = (await model.parse(replacement)) as Omit<T, "_id">;
+        replacement = (await model.parse(replacement)) as OmitId<T>;
         if (replacement._id) delete replacement._id;
 
         const collection = this._currDb.collection<T>(model.collection);

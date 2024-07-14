@@ -1,7 +1,9 @@
 import mongo from "mongodb";
+import { Model, MGModel } from "./model.js";
 import { ZodObject, ZodRawShape, z } from "zod";
-import { Model, MGModel, TypeOf } from "./model.js";
 import { ModelOptions } from "./options/modelOptions.js";
+
+import type { TypeOf } from "./types.js";
 
 namespace Mongooat {
     export type infer<T extends Model<mongo.BSON.Document, ZodRawShape>> = TypeOf<T>;
@@ -49,6 +51,7 @@ class Mongooat {
 
     /** Switches the current database context to the specified database name. */
     public useDb(dbName: string, options?: mongo.DbOptions): void {
+        // TODO: handle options
         this._currDb = this._base.db(dbName);
         this._model.currDb = this._currDb;
     }
