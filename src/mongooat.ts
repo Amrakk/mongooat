@@ -1,12 +1,13 @@
 import mongo from "mongodb";
-import { Model, MGModel } from "./model.js";
+import { MGModel } from "./model.js";
+import { Model } from "./baseModel.js";
 import { ZodObject, ZodRawShape, z } from "zod";
 import { ModelOptions } from "./options/modelOptions.js";
 
-import type { TypeOf } from "./types.js";
+import type { ModelMethods, TypeOf } from "./types.js";
 
 namespace Mongooat {
-    export type infer<T extends Model<mongo.BSON.Document, ZodRawShape>> = TypeOf<T>;
+    export type infer<T extends Model<mongo.BSON.Document, ZodRawShape, ModelMethods>> = TypeOf<T>;
 }
 
 /**
@@ -49,10 +50,14 @@ class Mongooat {
         this._model = new MGModel(this._currDb);
     }
 
+    /** Returns the MGModel instance associated with this Mongooat instance. */
+    public get model(): MGModel {
+        return this._model;
+    }
+
     /** Switches the current database context to the specified database name. */
     public useDb(dbName: string, options?: mongo.DbOptions): void {
-        // TODO: handle options
-        this._currDb = this._base.db(dbName);
+        this._currDb = this._base.db(dbName, options);
         this._model.currDb = this._currDb;
     }
 
@@ -74,11 +79,6 @@ class Mongooat {
             .then((cols) => cols.map((col) => col.name));
     }
 
-    /** Returns the MGModel instance associated with this Mongooat instance. */
-    public get model(): MGModel {
-        return this._model;
-    }
-
     /**
      * Creates and returns a new Model instance with the specified name, schema, and options.
      *
@@ -87,13 +87,15 @@ class Mongooat {
      * @param {ModelOptions<ST>} [options] - Optional configuration options for the model.
      * @returns {Model<z.infer<ZodObject<ST>>, ST>} A new Model instance.
      */
-    public Model<ST extends ZodRawShape>(
-        name: string,
-        schema: ZodObject<ST>,
-        options?: ModelOptions<ST>
-    ): Model<z.infer<ZodObject<ST>>, ST> {
-        type MT = z.infer<ZodObject<ST>>;
-        return new Model<MT, ST>(name, schema, options);
+    public Model<MM extends ModelMethods>() {
+        return <ST extends ZodRawShape>(
+            name: string,
+            schema: ZodObject<ST>,
+            options?: ModelOptions<ST>
+        ): Model<z.infer<ZodObject<ST>>, ST, MM> => {
+            type MT = z.infer<ZodObject<ST>>;
+            return new Model<MT, ST, MM>(name, schema, options);
+        };
     }
 }
 

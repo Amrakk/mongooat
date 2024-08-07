@@ -1,9 +1,12 @@
 import { BSON } from "mongodb";
 import { ZodRawShape } from "zod";
-import { Model } from "./model.js";
+import { Model } from "./baseModel.js";
 
-export type TypeOf<T extends Model<BSON.Document, ZodRawShape>> = T["_type"];
-export type ModelType = Model<BSON.Document, ZodRawShape>;
+export type ModelPluginType = { Methods: ModelMethods };
+export type ModelMethods = { [key: string]: (...args: any[]) => any };
+
+export type TypeOf<T extends Model<BSON.Document, ZodRawShape, ModelMethods>> = T["_type"];
+export type ModelType = Model<BSON.Document, ZodRawShape, ModelMethods>;
 
 export type OmitId<T> = Omit<T, "_id">;
 export type DeepPartial<T> = {
