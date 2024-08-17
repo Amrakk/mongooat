@@ -1,4 +1,4 @@
-import MongooatError from "./mongooatError.js";
+import MongooatError from "../mongooatError.js";
 
 /**
  * Thrown when the '_id' field is not allowed in an operation.

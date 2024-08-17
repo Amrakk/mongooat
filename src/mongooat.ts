@@ -1,13 +1,15 @@
-import mongo from "mongodb";
-import { MGModel } from "./model.js";
-import { Model } from "./baseModel.js";
+import { Model } from "./model.js";
 import { ZodObject, ZodRawShape, z } from "zod";
 import { ModelOptions } from "./options/modelOptions.js";
+import { Db, DbOptions, MongoClient, MongoClientOptions } from "mongodb";
 
-import type { ModelMethods, TypeOf } from "./types.js";
+import DBNotSetError from "./error/dbNotSet.js";
+
+import type { GetPaths, TypeOf } from "./types.js";
 
 namespace Mongooat {
-    export type infer<T extends Model<mongo.BSON.Document, ZodRawShape, ModelMethods>> = TypeOf<T>;
+    export type infer<T extends Model<any, any>> = TypeOf<T>;
+    export type paths<T extends Model<any, any>> = GetPaths<T>;
 }
 
 /**
@@ -19,46 +21,38 @@ namespace Mongooat {
  *
  * @example
  * // Example usage of the Mongooat class
- * import Mongooat from "mongooat";
+ * import { Mongooat, zod } from "mongooat";
  *
  * // Create a new Mongooat instance and connect to a MongoDB database
  * const mongooat = new Mongooat("mongodb://localhost:27017");
  *
- * // Switch to a specific database
+ * // Use a specific database
  * mongooat.useDb("mydb");
  *
  * // Define a model with a schema
- * const UserModel = mongooat.Model("users", z.object({
- *   name: z.string(),
- *   age: z.number()
+ * const UserModel = mongooat.Model("users", zod.object({
+ *   name: zod.string(),
+ *   age: zod.number()
  * }));
  *
  * // Perform a find operation using the defined model
- * const users = await mongooat.model.find(UserModel);
+ * const users = await UserModel.find();
  */
 class Mongooat {
     private _url: string;
 
-    private _model: MGModel;
-    private _currDb?: mongo.Db;
-    private _base: mongo.MongoClient;
+    private _currDb?: Db;
+    private _base: MongoClient;
 
-    constructor(url: string, options?: mongo.MongoClientOptions) {
+    constructor(url: string, options?: MongoClientOptions) {
         this._url = url;
-        this._base = new mongo.MongoClient(url, options);
+        this._base = new MongoClient(url, options);
         this._currDb = this._base.db();
-        this._model = new MGModel(this._currDb);
-    }
-
-    /** Returns the MGModel instance associated with this Mongooat instance. */
-    public get model(): MGModel {
-        return this._model;
     }
 
     /** Switches the current database context to the specified database name. */
-    public useDb(dbName: string, options?: mongo.DbOptions): void {
+    public useDb(dbName: string, options?: DbOptions): void {
         this._currDb = this._base.db(dbName, options);
-        this._model.currDb = this._currDb;
     }
 
     /** Get the names of all databases on the MongoDB server. */
@@ -85,17 +79,16 @@ class Mongooat {
      * @param {string} name - The name of the model to create.
      * @param {ZodObject<ST>} schema - A Zod schema object defining the structure and validation rules for the model's data.
      * @param {ModelOptions<ST>} [options] - Optional configuration options for the model.
-     * @returns {Model<z.infer<ZodObject<ST>>, ST>} A new Model instance.
+     * @returns {Model<z.infer<ZodObject<ST>>, ST>} - A new Model instance.
      */
-    public Model<MM extends ModelMethods>() {
-        return <ST extends ZodRawShape>(
-            name: string,
-            schema: ZodObject<ST>,
-            options?: ModelOptions<ST>
-        ): Model<z.infer<ZodObject<ST>>, ST, MM> => {
-            type MT = z.infer<ZodObject<ST>>;
-            return new Model<MT, ST, MM>(name, schema, options);
-        };
+    public Model<MT extends z.infer<ZodObject<ST>>, ST extends ZodRawShape>(
+        name: string,
+        schema: ZodObject<ST>,
+        options?: ModelOptions<MT>
+    ): Model<MT, ST> {
+        if (!this._currDb) throw new DBNotSetError();
+
+        return new Model<MT, ST>(name, schema, this._currDb, options);
     }
 }
 

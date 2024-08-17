@@ -1,4 +1,4 @@
-import MongooatError from "./mongooatError.js";
+import MongooatError from "../mongooatError.js";
 
 /**
  * Thrown when an invalid schema is provided when creating a model.
