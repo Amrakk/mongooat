@@ -6,12 +6,10 @@
  * @param {string} [message] - Optional error message that describes the error, passed to the `Error` constructor.
  * @param {ErrorOptions} [options] - Optional `ErrorOptions` object that allows for configuring the error instance.
  */
-class MongooatError extends Error {
+export default class MongooatError extends Error {
     name = "MongooatError";
 
     constructor(message?: string, options?: ErrorOptions) {
         super(message, options);
     }
 }
-
-export default MongooatError;

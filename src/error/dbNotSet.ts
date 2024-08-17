@@ -1,13 +1,12 @@
 import MongooatError from "./mongooatError.js";
 
 /**
- * `DBNotSetError` is designed to handle the case where Mongooat operations are
- * attempted before the database connection has been successfully established.
+ * Thrown when an operation is attempted without setting the database.
  *
  * @extends MongooatError
  */
 export default class DBNotSetError extends MongooatError {
     constructor() {
-        super("Database not set. Please use useDb() to set the database.");
+        super("Database not set. Please use 'useDb()' to set the database.");
     }
 }

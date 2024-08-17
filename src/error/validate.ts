@@ -2,9 +2,7 @@ import { ZodIssue } from "zod";
 import MongooatError from "./mongooatError.js";
 
 /**
- * `ValidateError` is designed to handle validation errors specifically.It is designed
- * to encapsulate validation issues identified by Zod. This class stores an array
- * of `ZodIssue` objects, which represent individual validation problems.
+ * Thrown when a model fails validation.
  *
  * @extends MongooatError
  * @property {ZodIssue[]} errors - An array of `ZodIssue` instances representing the validation errors.
@@ -14,7 +12,7 @@ import MongooatError from "./mongooatError.js";
 export default class ValidateError extends MongooatError {
     errors: ZodIssue[];
     constructor(name: string, errors: ZodIssue[]) {
-        super(`Model ${name} validation failed`);
+        super(`Model '${name}' validation failed`);
         this.errors = errors;
     }
 }
