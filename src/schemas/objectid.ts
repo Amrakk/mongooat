@@ -5,5 +5,3 @@ import { ObjectId } from "mongodb";
 export const ZodObjectId = z.custom<ObjectId>((value) => ObjectId.isValid(value), {
     message: "Invalid ObjectID",
 });
-
-export type ZodObjectId = z.infer<typeof ZodObjectId>;

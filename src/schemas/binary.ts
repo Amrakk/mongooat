@@ -5,5 +5,3 @@ import { BSON } from "mongodb";
 export const ZodBinary = z.custom<BSON.Binary>((value) => value instanceof BSON.Binary, {
     message: "Invalid Binary",
 });
-
-export type ZodBinary = z.infer<typeof ZodBinary>;

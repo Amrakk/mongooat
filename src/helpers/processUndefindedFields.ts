@@ -1,7 +1,7 @@
 /** Processes undefined fields in a document for MongoDB update operations. */
 export function processUndefinedFieldsForUpdate<T extends Record<keyof any, any>>(data: T) {
     let set: Partial<T> = {};
-    let unset: Record<string, any> = {};
+    let unset: Record<keyof any, any> = {};
 
     const processField = (obj: T, parentKey: string = "", resultSet: any = set) => {
         for (const key in obj) {

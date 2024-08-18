@@ -5,5 +5,3 @@ import { BSON } from "mongodb";
 export const ZodDecimal128 = z.custom<BSON.Decimal128>((value) => value instanceof BSON.Decimal128, {
     message: "Invalid Decimal128",
 });
-
-export type ZodDecimal128 = z.infer<typeof ZodDecimal128>;

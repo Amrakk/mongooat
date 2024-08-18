@@ -1,6 +1,6 @@
 import Mongooat from "./mongooat.js";
 export { Mongooat };
 
-export * as zod from "zod";
-export * from "./schema/index.js";
+export { z } from "zod";
+export * from "./schemas/index.js";
 export { ObjectId, BSON } from "mongodb";
