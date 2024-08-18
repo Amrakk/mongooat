@@ -1,21 +1,36 @@
 {
     "name": "mongooat",
     "version": "2.0.0",
-    "description": "None",
-    "main": "build/index.js",
-    "type": "module",
-    "scripts": {
-        "dev": "node index.js",
-        "build": "tsc",
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
     "author": "4mr4kk",
-    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/amrakk/mongooat.git"
+    },
+    "bugs": {
+        "url": "https://github.com/amrakk/mongooat/issues"
+    },
+    "type": "module",
+    "main": "build/index.js",
     "dependencies": {
         "mongodb": "^6.7.0",
         "zod": "^3.23.8"
     },
     "devDependencies": {
         "typescript": "^5.4.5"
+    },
+    "description": "None",
+    "keywords": [
+        "typescript",
+        "mongodb",
+        "schema",
+        "model",
+        "zod"
+    ],
+    "homepage": "https://github.com/amrakk/mongooat.git",
+    "license": "MIT",
+    "scripts": {
+        "dev": "node index.js",
+        "build": "tsc",
+        "test": "echo \"Error: no test specified\" && exit 1"
     }
 }
