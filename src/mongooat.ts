@@ -7,8 +7,32 @@ import DBNotSetError from "./error/dbNotSet.js";
 
 import type { GetPaths, TypeOf } from "./types.js";
 
+// type infer, paths inspired by Zod
 namespace Mongooat {
+    /**
+     * Get the type of a model instance.
+     *
+     * @example
+     * type User = Mongooat.infer<typeof UserModel>;
+     */
     export type infer<T extends Model<any, any>> = TypeOf<T>;
+
+    /**
+     * Returns all possible key paths of an object type, including nested objects and arrays.
+     *
+     * For arrays, the key path will include the array index.
+     * If you use `<idx>` as the index key, it will refer to every element in the array.
+     *
+     * NOTE:
+     * Unsupported types:
+     *  - Unions, Discriminated Unions
+     *  - Intersections
+     *  - Maps, Sets, Records
+     *
+     * @example
+     * type UserPaths = Mongooat.paths<typeof UserModel>;
+     * // "name" | "age" | "address" | "address.city" | "address.country" | "roles" | "roles.<idx>"
+     */
     export type paths<T extends Model<any, any>> = GetPaths<T>;
 }
 
@@ -20,8 +44,7 @@ namespace Mongooat {
  * @public
  *
  * @example
- * // Example usage of the Mongooat class
- * import { Mongooat, zod } from "mongooat";
+ * import { Mongooat, z } from "mongooat";
  *
  * // Create a new Mongooat instance and connect to a MongoDB database
  * const mongooat = new Mongooat("mongodb://localhost:27017");
@@ -30,9 +53,9 @@ namespace Mongooat {
  * mongooat.useDb("mydb");
  *
  * // Define a model with a schema
- * const UserModel = mongooat.Model("users", zod.object({
- *   name: zod.string(),
- *   age: zod.number()
+ * const UserModel = mongooat.Model("users", z.object({
+ *   name: z.string(),
+ *   age: z.number()
  * }));
  *
  * // Perform a find operation using the defined model

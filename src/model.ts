@@ -1,16 +1,16 @@
 import { ZodObject, ZodRawShape } from "zod";
+import { deleteField } from "./helpers/deleteField.js";
 import { validateSchema } from "./helpers/validateSchema.js";
 import { ObjectKeyPaths, OmitId, UpdateType } from "./types.js";
 import { generateUpdateSchema } from "./helpers/generateUpdateSchema.js";
 import { DefaultModelOptions, ModelOptions } from "./options/modelOptions.js";
+import mongo, { Collection, Db, Filter, ModifyResult, ObjectId, OptionalUnlessRequiredId } from "mongodb";
 import { processUndefinedFieldsForUpdate, removeUndefinedFields } from "./helpers/processUndefindedFields.js";
-import mongo, { BSON, Collection, Db, Filter, ModifyResult, ObjectId, OptionalUnlessRequiredId } from "mongodb";
 
 import ValidateError from "./error/validate.js";
 import InvalidSchemaError from "./error/model/invalidSchema.js";
 import MissingModelNameError from "./error/model/missingModelName.js";
 import IdFieldNotAllowedError from "./error/model/idFieldNotAllowed.js";
-import { DEFAULT_ARRAY_PATH_KEY } from "./constants.js";
 
 /**
  * Represents a model that maps to a MongoDB collection and defines the structure of documents within that collection
@@ -70,13 +70,11 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
     /**
      * Parses the provided data object using the model's schema and returns the result as a document of the specified type.
      *
-     * @param data - The data object to parse.
-     * @param isPartial - A boolean value indicating whether to parse the data as a partial document.
+     * @param {Record<keyof any, unknown>} data - The data object to parse.
+     * @param {true | undefined} isPartial - A boolean value indicating whether to parse the data as a partial document.
      *
-     * @returns The parsed document object.
+     * @returns {Promise<Type | Partial<Type>>} The parsed document object.
      */
-    public async parse(data: Record<keyof any, unknown>): Promise<Type>;
-    public async parse(data: Record<keyof any, unknown>, isPartial: true): Promise<Partial<Type>>;
     public async parse(data: Record<keyof any, unknown>, isPartial?: true): Promise<Type | Partial<Type>> {
         const schema = isPartial ? generateUpdateSchema(this.schema, data) : this.schema;
         const test = await schema.strict().safeParseAsync(data);
@@ -89,10 +87,10 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Attempts to parse the provided data object using the model's schema and returns a boolean value indicating
      * whether the parsing was successful.
      *
-     * @param data - The data object to parse.
-     * @param isPartial - A boolean value indicating whether to parse the data as a partial document.
+     * @param {Record<keyof any, unknown>} data - The data object to parse.
+     * @param {true | undefined} isPartial - A boolean value indicating whether to parse the data as a partial document.
      *
-     * @returns A boolean value indicating whether the parsing was successful.
+     * @returns {Promise<boolean>} A boolean value indicating whether the parsing was successful.
      */
     public async tryParse(data: Record<string, unknown>, isPartial?: true): Promise<boolean> {
         const schema = isPartial ? this.schema.partial() : this.schema;
@@ -102,46 +100,31 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
     /**
      * Hides the specified fields from the provided data object or array of objects.
      *
+     * NOTE:
+     * Unsupported types:
+     * - Unions, Discriminated Unions
+     * - Intersections
+     * - Maps, Sets, Records
+     *
      * @param {Type} data - The data object or array of objects from which to hide fields.
      * @param {ObjectKeyPaths<Type>[]}  hiddenFields - An optional array of field names to hide from the data object(s).
      *
      * @returns {Type | Type[]} The data object or array of objects with the specified fields hidden.
+     *
+     * @todo Handle return type.
      */
     public hideFields(data: Type, hiddenFields?: ObjectKeyPaths<Type>[]): Type;
     public hideFields(data: Type[], hiddenFields?: ObjectKeyPaths<Type>[]): Type[];
     public hideFields(data: Type | Type[], hiddenFields?: ObjectKeyPaths<Type>[]): Type | Type[] {
-        // TODO: handle return type
         hiddenFields = hiddenFields ?? this.options.hiddenFields ?? [];
         if (hiddenFields.length === 0) return data;
 
         const processItem = (item: Type) => {
-            for (const field of hiddenFields) this.deleteNestedField(item, field);
+            for (const field of hiddenFields) deleteField(item, field);
             return item;
         };
 
         return Array.isArray(data) ? data.map(processItem) : processItem(data);
-    }
-
-    /** Deletes the specified nested field from the provided object. */
-    private deleteNestedField(obj: Record<keyof any, any>, path: string): void {
-        const keys = path.split(".");
-        let current: any = obj;
-
-        for (let i = 0; i < keys.length - 1; i++) {
-            if (keys[i] === DEFAULT_ARRAY_PATH_KEY && Array.isArray(current))
-                return current.forEach((item: any) => this.deleteNestedField(item, keys.slice(i + 1).join(".")));
-            if (current[keys[i]] === undefined) return;
-            current = current[keys[i]];
-        }
-
-        const lastKey = keys[keys.length - 1];
-        const index = Number(lastKey);
-
-        if (!isNaN(index) && Array.isArray(current)) {
-            if (index >= 0 && index < current.length) current.splice(index, 1);
-        } else {
-            delete current[lastKey];
-        }
     }
 
     //////////////////////////
@@ -153,9 +136,9 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
     /**
      * Finds documents in the collection that match the specified filter criteria.
      *
-     * @param {Filter<Type>} [filter] - Optional filter criteria to apply to the find operation.
-     * @param {mongo.FindOptions} [options] - Optional settings for the `find` operation. Learn more at
-     *                                        {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html}.
+     * @param {Filter<Type>} filter - Optional filter criteria to apply to the find operation.
+     * @param {mongo.FindOptions} options - Optional settings for the `find` operation. Learn more at
+     *                                        {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html this}.
      *
      * @returns {Promise<Type[]>} A promise that resolves to an array of documents matching the criteria.
      *
@@ -171,8 +154,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Finds a document in the collection by its ID.
      *
      * @param {string | ObjectId} id - The ID of the document to find.
-     * @param {mongo.FindOptions} [options] - Optional settings for the `findById` operation. Learn more at
-     *                                        {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html}.
+     * @param {mongo.FindOptions} options - Optional settings for the `findById` operation. Learn more at
+     *                                        {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html this}.
      *
      * @returns {Promise<Type | null>} A promise that resolves to the document matching the ID.
      *                                 If no document is found, the promise resolves to null.
@@ -191,8 +174,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      *
      * @param {string | ObjectId} id - The ID of the document to find and update.
      * @param {UpdateType<Type>} update - The update to apply to the document.
-     * @param {mongo.FindOneAndUpdateOptions} [options] - Optional settings for the `findByIdAndUpdate` operation. Learn more at
-     *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html}.
+     * @param {mongo.FindOneAndUpdateOptions} options - Optional settings for the `findByIdAndUpdate` operation. Learn more at
+     *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html this}.
      *
      * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the original document or `null` if no document is found.
      *
@@ -231,8 +214,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      *
      * @param {string | ObjectId} id - The ID of the document to find and replace.
      * @param {OmitId<Type>} replacement - The replacement document.
-     * @param {mongo.FindOneAndReplaceOptions} [options] - Optional settings for the `findByIdAndReplace` operation. Learn more at
-     *                                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html}.
+     * @param {mongo.FindOneAndReplaceOptions} options - Optional settings for the `findByIdAndReplace` operation. Learn more at
+     *                                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html this}.
      *
      * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the original document or `null` if no document is found.
      *
@@ -270,8 +253,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Finds a document in the collection by its ID and deletes it.
      *
      * @param {string | ObjectId} id - The ID of the document to find and delete.
-     * @param {mongo.FindOneAndDeleteOptions} [options] - Optional settings for the `findByIdAndDelete` operation. Learn more at
-     *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html}.
+     * @param {mongo.FindOneAndDeleteOptions} options - Optional settings for the `findByIdAndDelete` operation. Learn more at
+     *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html this}.
      *
      * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the deleted document or `null` if no document is found.
      *
@@ -302,8 +285,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Finds a document in the collection that match the specified filter criteria.
      *
      * @param {Filter<Type>} [filter] - Optional filter criteria to apply to the find operation.
-     * @param {mongo.FindOptions} [options] - Optional settings for the `findOne` operation. Learn more at
-     *                                        {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html}.
+     * @param {mongo.FindOptions} options - Optional settings for the `findOne` operation. Learn more at
+     *                                        {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html this}.
      *
      * @returns {Promise<Type | null>} A promise that resolves to the first document matching the criteria.
      *
@@ -320,8 +303,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the document.
-     * @param {mongo.FindOneAndUpdateOptions} [options] - Options for the `findOneAndUpdate` operation. Learn more at
-     *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html}.
+     * @param {mongo.FindOneAndUpdateOptions} options - Options for the `findOneAndUpdate` operation. Learn more at
+     *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html this}.
      *
      * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the original document or `null` if no document is found.
      *
@@ -377,8 +360,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
      * @param {OmitId<Type>} replacement - The replacement document.
-     * @param {mongo.FindOneAndReplaceOptions} [options] - Optional settings for the `findOneAndReplace` operation. Learn more at
-     *                                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html}.
+     * @param {mongo.FindOneAndReplaceOptions} options - Optional settings for the `findOneAndReplace` operation. Learn more at
+     *                                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html this}.
      *
      * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the original document or `null` if no document is found.
      *
@@ -428,8 +411,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Finds a document in the collection that match the specified filter criteria and deletes it.
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to delete.
-     * @param {mongo.FindOneAndDeleteOptions} [options] - Options for the `findOneAndDelete` operation. Learn more at
-     *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html}.
+     * @param {mongo.FindOneAndDeleteOptions} options - Options for the `findOneAndDelete` operation. Learn more at
+     *                                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html this}.
      *
      * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the deleted document or `null` if no document is found.
      *
@@ -485,8 +468,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Inserts a single document into the collection.
      *
      * @param {Type} data - The document to insert into the collection.
-     * @param {mongo.InsertOneOptions} [options] - Optional settings for the insert operation. Learn more at
-     *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/InsertOneOptions.html}.
+     * @param {mongo.InsertOneOptions} options - Optional settings for the insert operation. Learn more at
+     *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/InsertOneOptions.html this}.
      *
      * @returns {Promise<mongo.InsertOneResult>} A promise that resolves to the result of the insert operation.
      *
@@ -502,8 +485,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Inserts multiple documents into the collection.
      *
      * @param {Type[]} data - An array of documents to insert into the collection.
-     * @param {mongo.BulkWriteOptions} [options] - Optional settings for the bulk write operation. Learn more at
-     *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/BulkWriteOptions.html}.
+     * @param {mongo.BulkWriteOptions} options - Optional settings for the bulk write operation. Learn more at
+     *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/BulkWriteOptions.html this}.
      *
      * @returns {Promise<mongo.InsertManyResult>} A promise that resolves to the result of the insert operation.
      *
@@ -539,8 +522,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the document.
-     * @param {mongo.UpdateOptions} [options] - Optional settings for the update operation. Learn more at
-     *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html}.
+     * @param {mongo.UpdateOptions} options - Optional settings for the update operation. Learn more at
+     *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html this}.
      *
      * @returns {Promise<mongo.UpdateResult>} A promise that resolves to the result of the update operation.
      *
@@ -561,8 +544,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the documents to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the documents.
-     * @param {mongo.UpdateOptions} [options] - Optional settings for the update operation. Learn more at
-     *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html}.
+     * @param {mongo.UpdateOptions} options - Optional settings for the update operation. Learn more at
+     *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html this}.
      *
      * @returns {Promise<mongo.UpdateResult>} A promise that resolves to the result of the update operation.
      *
@@ -598,8 +581,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to replace.
      * @param {OmitId<Type>} replacement - The replacement document that will replace the existing document.
-     * @param {mongo.ReplaceOptions} [options] - Optional settings for the replace operation. Learn more at
-     *                                           {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/ReplaceOptions.html}.
+     * @param {mongo.ReplaceOptions} options - Optional settings for the replace operation. Learn more at
+     *                                           {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/ReplaceOptions.html this}.
      *
      * @returns {Promise<mongo.UpdateResult>} A promise that resolves to the result of the replace operation.
      *
@@ -622,8 +605,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Deletes a single document in the collection that matches the given filter criteria.
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to delete.
-     * @param {mongo.DeleteOptions} [options] - Optional settings for the delete operation. Learn more at
-     *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/DeleteOptions.html}.
+     * @param {mongo.DeleteOptions} options - Optional settings for the delete operation. Learn more at
+     *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/DeleteOptions.html this}.
      *
      * @returns {Promise<mongo.DeleteResult>} A promise that resolves to the result of the delete operation.
      *
@@ -639,8 +622,8 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
      * Deletes multiple documents in the collection that match the given filter criteria.
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the documents to delete.
-     * @param {mongo.DeleteOptions} [options] - Optional settings for the delete operation. Learn more at
-     *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/DeleteOptions.html}.
+     * @param {mongo.DeleteOptions} options - Optional settings for the delete operation. Learn more at
+     *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/DeleteOptions.html this}.
      *
      * @returns {Promise<mongo.DeleteResult>} A promise that resolves to the result of the delete operation.
      *

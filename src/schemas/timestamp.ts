@@ -5,5 +5,3 @@ import { BSON } from "mongodb";
 export const ZodTimestamp = z.custom<BSON.Timestamp>((value) => value instanceof BSON.Timestamp, {
     message: "Invalid Timestamp",
 });
-
-export type ZodTimestamp = z.infer<typeof ZodTimestamp>;

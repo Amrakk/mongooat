@@ -5,5 +5,3 @@ import { BSON } from "mongodb";
 export const ZodRegExp = z.custom<BSON.BSONRegExp>((value) => value instanceof BSON.BSONRegExp, {
     message: "Invalid BSONRegExp",
 });
-
-export type ZodRegExp = z.infer<typeof ZodRegExp>;
