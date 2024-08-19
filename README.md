@@ -1,6 +1,6 @@
 # Mongooat
 
-**Mongooat** is a TypeScript utility that combines Zod schemas with [MongoDB](http://mongodb.com), providing a straightforward method for model validation and type inference.
+**Mongooat** is a TypeScript utility that combines [Zod](https://zod.dev) schemas with [MongoDB](https://mongodb.com), providing a straightforward method for model validation and type inference.
 
 [![NPM version](https://badge.fury.io/js/mongooat.svg)](http://badge.fury.io/js/mongooat)
 [![MIT License][license-shield]][license-url]
@@ -70,7 +70,7 @@ You can use other operations like `findById()`, `insertOne()`, `deleteOne()`, et
 const user = await UserModel.findById("userId");
 ```
 
-### Type inference
+### Type Inference
 
 Extract TypeScript type by inferring the type of any model with `Mongooat.infer<typeof Model>`.
 
