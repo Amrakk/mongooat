@@ -16,3 +16,6 @@ export const DEFAULT_PATH_OPTIONS = Object.freeze({
 // schema
 /** Invalid Zod types that are not supported for key paths. */
 export const INVALID_ZOD_TYPES = [z.ZodVoid, z.ZodPromise, z.ZodFunction];
+
+/** Invalid `_id` Zod types */
+export const INVALID_ID_ZOD_TYPES = [z.ZodArray, z.ZodTuple, z.ZodUndefined, z.ZodUnknown];
