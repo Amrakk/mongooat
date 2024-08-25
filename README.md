@@ -1,12 +1,12 @@
 # Mongooat
 
-**Mongooat** is a TypeScript utility that combines [Zod](https://zod.dev) schemas with [MongoDB](https://mongodb.com), providing a straightforward method for model validation and type inference.
+**Mongooat** is a TypeScript utility that combines [Zod][zod-url] schemas with [MongoDB][mongodb-url], providing a straightforward method for model validation and type inference.
 
-[![NPM version](https://badge.fury.io/js/mongooat.svg)](http://badge.fury.io/js/mongooat)
+[![NPM version][npm-fury]][npm-url]
 [![MIT License][license-shield]][license-url]
 
--   [Bug report](https://github.com/amrakk/Mongooat/issues/new?labels=bug&template=bug-report.md)
--   [Feature request](https://github.com/amrakk/Mongooat/issues/new?labels=enhancement&template=feature-request.md)
+-   [Bug report][bug-report-url]
+-   [Feature request][feat-request-url]
 
 ## Installation
 
@@ -90,7 +90,7 @@ type modelPaths = Mongooat.paths<typeof UserModel>;
 
 For arrays, the key path will include the array index. If you use `<idx>` as the index key, it will refer to every element in the array.
 
-**Note:** _This is not yet support unions, discriminated unions, intersections, maps, sets, and records._
+\***\*Note:** \*\* _This is not yet support nested maps, sets, and records (e.g. `Map<string, {test: string}>`)._
 
 ## Contact
 
@@ -100,8 +100,8 @@ For arrays, the key path will include the array index. If you use `<idx>` as the
 
 Credits to:
 
--   [Zod][zod-url]: TypeScript schema validation.
--   [Mongoose][mongoose-url] : ODM library for MongoDB
+-   [Zod][zod-github-url]: TypeScript schema validation.
+-   [Mongoose][mongoose-github-url] : ODM library for MongoDB
 
 ## License
 
@@ -109,9 +109,15 @@ This project is licensed under the MIT License. See the [LICENSE file](LICENSE) 
 
 <!-- LINKS AND IMAGES -->
 
+[npm-fury]: https://badge.fury.io/js/mongooat.svg
+[npm-url]: https://badge.fury.io/js/mongooat
+[bug-report-url]: https://github.com/amrakk/Mongooat/issues/new?labels=bug&template=bug-report.md
+[feat-request-url]: https://github.com/amrakk/Mongooat/issues/new?labels=enhancement&template=feature-request.md
 [license-shield]: https://img.shields.io/github/license/Amrakk/mongooat.svg
 [license-url]: https://github.com/Amrakk/mongooat/blob/master/LICENSE
 [discord-shield]: https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white
 [discord-url]: https://discordapp.com/users/460114509307314186
-[zod-url]: https://github.com/colinhacks/zod
-[mongoose-url]: https://github.com/Automattic/mongoose
+[zod-url]: https://zod.dev
+[mongodb-url]: https://www.mongodb.com/
+[zod-github-url]: https://github.com/colinhacks/zod
+[mongoose-github-url]: https://github.com/Automattic/mongoose

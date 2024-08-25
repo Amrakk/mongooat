@@ -5,7 +5,8 @@ import { Db, DbOptions, MongoClient, MongoClientOptions } from "mongodb";
 
 import DBNotSetError from "./error/dbNotSet.js";
 
-import type { GetPaths, TypeOf } from "./types.js";
+import type { ValidSchemaType } from "./types.js";
+import type { TypeOf, GetPaths } from "./model.js";
 
 // type infer, paths inspired by Zod
 namespace Mongooat {
@@ -23,10 +24,8 @@ namespace Mongooat {
      * For arrays, the key path will include the array index.
      * If you use `<idx>` as the index key, it will refer to every element in the array.
      *
-     * NOTE:
-     * Unsupported types:
-     *  - Unions, Discriminated Unions
-     *  - Intersections
+     * **Note:**
+     * Unsupported nested types:
      *  - Maps, Sets, Records
      *
      * @example
@@ -96,17 +95,27 @@ class Mongooat {
             .then((cols) => cols.map((col) => col.name));
     }
 
+    /** Close the connection to the MongoDB server. */
+    public async close(force?: boolean): Promise<void> {
+        return this._base.close(force);
+    }
+
     /**
      * Creates and returns a new Model instance with the specified name, schema, and options.
+     *
+     * **Note:**
+     * - `_id` field must not be an `array`, `tuple`, `undefined` or `unknown`.
+     * - If the `_id` field is invalid, the schema type resolves to `never`.
      *
      * @param {string} name - The name of the model to create.
      * @param {ZodObject<ST>} schema - A Zod schema object defining the structure and validation rules for the model's data.
      * @param {ModelOptions<ST>} [options] - Optional configuration options for the model.
-     * @returns {Model<z.infer<ZodObject<ST>>, ST>} - A new Model instance.
+     *
+     * @returns {Model<MT, ST>} - A new Model instance.
      */
     public Model<MT extends z.infer<ZodObject<ST>>, ST extends ZodRawShape>(
         name: string,
-        schema: ZodObject<ST>,
+        schema: z.ZodObject<ST> & ValidSchemaType<ST>,
         options?: ModelOptions<MT>
     ): Model<MT, ST> {
         if (!this._currDb) throw new DBNotSetError();

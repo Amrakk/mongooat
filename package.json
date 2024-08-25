@@ -1,24 +1,30 @@
 {
     "name": "mongooat",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "author": "4mr4kk",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/amrakk/mongooat.git"
     },
     "bugs": {
-        "url": "https://github.com/amrakk/mongooat/issues"
+        "url": "https://github.com/amrakk/Mongooat/issues/new?labels=bug&template=bug-report.md"
     },
     "type": "module",
     "main": "build/index.js",
     "dependencies": {
-        "mongodb": "^6.7.0",
-        "zod": "^3.23.8"
+        "mongodb": "6.7.0",
+        "zod": "3.23.8"
     },
     "devDependencies": {
-        "typescript": "^5.4.5"
+        "chai": "^5.1.1",
+        "mocha": "^10.7.3",
+        "ts-node": "^10.9.2",
+        "ts-mocha": "^10.0.0",
+        "typescript": "^5.4.5",
+        "@types/chai": "^4.3.17",
+        "@types/mocha": "^10.0.7"
     },
-    "description": "None",
+    "description": "TypeScript utility for validating MongoDB models with Zod schemas.",
     "keywords": [
         "typescript",
         "mongodb",
@@ -29,8 +35,7 @@
     "homepage": "https://github.com/amrakk/mongooat.git",
     "license": "MIT",
     "scripts": {
-        "dev": "node index.js",
         "build": "tsc",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "ts-mocha -n loader=ts-node/esm tests/**/*.test.ts"
     }
 }

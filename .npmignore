@@ -1,6 +1,8 @@
 notes.txt
 
+.github
 .npmignore
 .gitignore
 
 /src
+/tests
