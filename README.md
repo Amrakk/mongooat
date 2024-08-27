@@ -90,7 +90,7 @@ type modelPaths = Mongooat.paths<typeof UserModel>;
 
 For arrays, the key path will include the array index. If you use `<idx>` as the index key, it will refer to every element in the array.
 
-\***\*Note:** \*\* _This is not yet support nested maps, sets, and records (e.g. `Map<string, {test: string}>`)._
+**Note:** _This is not yet support nested maps, sets, and records (e.g. `Map<string, {test: string}>`)._
 
 ## Contact
 

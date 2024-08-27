@@ -36,9 +36,9 @@
     "homepage": "https://github.com/amrakk/mongooat.git",
     "license": "MIT",
     "scripts": {
-        "build": "tsc",
         "clean": "rimraf ./build",
+        "build": "npm run clean && tsc",
         "test": "ts-mocha -n loader=ts-node/esm tests/**/*.test.ts",
-        "prepublishOnly": "npm run test && npm run clean && npm run build"
+        "prepublishOnly": "npm run test && npm run build"
     }
 }
