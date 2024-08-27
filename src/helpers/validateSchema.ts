@@ -4,11 +4,15 @@ import InvalidSchemaError from "../error/model/invalidSchema.js";
 import { DEFAULT_ARRAY_PATH_KEY, INVALID_ID_ZOD_TYPES, INVALID_ZOD_TYPES } from "../constants.js";
 
 /**
- * Validate if a schema is a valid schema for a MongoDB document.
+ * Validates a Zod schema to ensure it is compatible with MongoDB document structures.
  *
  * **Note:**
- * - `_id` field must not be an `array`, `tuple`, `undefined` or `unknown`.
- * - Except for `ZodObject` and `ZodArray`, this does not yet apply to verifying nested schemas.
+ * - The `_id` field must not be an `array`, `tuple`, `undefined`, or `unknown` type.
+ * - Except for ZodObject and ZodArray, this does not yet apply to verifying nested schemas.
+ *
+ * @param {z.ZodObject<T>} zod - The Zod schema to validate.
+ * @param {string} modelName - The name of the model being validated. Used in error reporting.
+ * @throws {InvalidSchemaError} Throws an error if the schema contains invalid types.
  */
 export function validateSchema<T extends z.ZodRawShape>(zod: z.ZodObject<T>, modelName: string): void {
     const err: InvalidSchemaMap = [];
@@ -34,11 +38,11 @@ export function validateSchema<T extends z.ZodRawShape>(zod: z.ZodObject<T>, mod
         }
     };
 
-    processSchema(zod);
+    processSchema(idField ? zod.omit({ _id: true } as any) : zod);
     if (err.length > 0) throw new InvalidSchemaError(modelName, err);
 }
 
-/** Get the base schema of a Zod schema */
+/** Extracts the base schema by unwrapping optional and nullable Zod schemas */
 function getBaseSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
     while (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) schema = schema.unwrap();
     return schema;

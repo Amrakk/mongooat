@@ -99,7 +99,7 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
         const test = await schema.strict().safeParseAsync(data);
 
         if (!test.success) throw new ValidateError(this.name, test.error.errors);
-        return (isPartial ? data : removeUndefinedFields(data)) as Type | Partial<Type>;
+        return data as Type | Partial<Type>;
     }
 
     /**
@@ -412,10 +412,14 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
         options?: mongo.FindOneAndReplaceOptions
     ): Promise<ModifyResult<Type> | Type | null> {
         if (replacement.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
-        replacement = (await this.parse(
-            replacement,
-            this.schema.shape.hasOwnProperty("_id") ? { partialFields: ["_id"] as ObjectKeyPaths<Type>[] } : undefined
-        )) as OmitId<Type>;
+        replacement = removeUndefinedFields(
+            await this.parse(
+                replacement,
+                this.schema.shape.hasOwnProperty("_id")
+                    ? { partialFields: ["_id"] as ObjectKeyPaths<Type>[] }
+                    : undefined
+            )
+        ) as OmitId<Type>;
 
         let res;
         if (options) {
@@ -531,13 +535,14 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
         options?: mongo.InsertOneOptions | mongo.BulkWriteOptions
     ): Promise<mongo.InsertOneResult | mongo.InsertManyResult> {
         if (Array.isArray(data)) {
-            data = await Promise.all(data.map((doc) => this.parse(doc)));
+            data = await Promise.all(data.map(async (doc) => removeUndefinedFields(await this.parse(doc)) as Type));
+
             return this.collection.insertMany(
                 data as OptionalUnlessRequiredId<Type>[],
                 options as mongo.BulkWriteOptions
             );
         } else {
-            data = await this.parse(data);
+            data = removeUndefinedFields(await this.parse(data)) as Type;
             return this.collection.insertOne(data as OptionalUnlessRequiredId<Type>, options as mongo.InsertOneOptions);
         }
     }
@@ -621,10 +626,14 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
         options?: mongo.ReplaceOptions
     ): Promise<mongo.UpdateResult> {
         if (replacement.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
-        replacement = (await this.parse(
-            replacement,
-            this.schema.shape.hasOwnProperty("_id") ? { partialFields: ["_id"] as ObjectKeyPaths<Type>[] } : undefined
-        )) as OmitId<Type>;
+        replacement = removeUndefinedFields(
+            await this.parse(
+                replacement,
+                this.schema.shape.hasOwnProperty("_id")
+                    ? { partialFields: ["_id"] as ObjectKeyPaths<Type>[] }
+                    : undefined
+            )
+        ) as OmitId<Type>;
 
         return this.collection.replaceOne(filter, replacement, options) as Promise<mongo.UpdateResult>;
     }
