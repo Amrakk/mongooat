@@ -1,5 +1,6 @@
-import { z } from "zod";
-import { DEFAULT_PATH_OPTIONS } from "./constants.js";
+import type { z } from "zod";
+import type { CreateIndexesOptions, IndexDescription, IndexDirection } from "mongodb";
+import type { DEFAULT_PATH_OPTIONS, POSITIONAL_OPERATOR_MAP, WILDCARD_INDEX_MAP } from "./constants.js";
 
 /************************/
 /************************/
@@ -61,26 +62,43 @@ type RemoveUndefined<T> = T extends undefined ? never : T;
  *
  * @todo Add support for maps, sets, and records.
  */
-export type ObjectKeyPaths<O extends Record<keyof any, unknown>> = {
+export type ObjectKeyPaths<O extends Record<keyof any, unknown>> = ExtractKeyPaths<O, never>;
+
+/** Extracts all possible key paths of an object. */
+type ExtractKeyPaths<O extends Record<keyof any, unknown>, ArrKeyPath extends string> = {
     [K in Extract<keyof O, string>]:
         | K
+        | ArrKeyPath
         | (NonNullable<O[K]> extends Array<any>
-              ? ExtractArray<NonNullable<O[K]>, K>
+              ? ExtractArrayPaths<NonNullable<O[K]>, K, ArrKeyPath>
               : NonNullable<O[K]> extends Record<keyof any, unknown>
-              ? `${K}.${ObjectKeyPaths<NonNullable<O[K]>>}`
+              ? `${K}.${ExtractKeyPaths<NonNullable<O[K]>, ArrKeyPath>}`
               : never);
 }[Extract<keyof O, string>];
 
-/** Extracts all possible key paths of an array type. */
-type ExtractArray<A extends Array<any>, Base extends string, Depth extends Prev[number] = DefaultArrayPathLength> = {
+/** Extracts all possible key paths of an array. */
+type ExtractArrayPaths<
+    A extends Array<any>,
+    Base extends string,
+    ArrKeyPath extends string,
+    Depth extends Prev[number] = DefaultArrayPathLength
+> = {
     [K in keyof A]:
-        | `${Base}.${IsArray<A> extends true ? ArrayItem : K}`
+        | `${Base}.${IsArray<A> extends true ? ArrayItem<ArrKeyPath> : K}`
         | (Depth extends 0
               ? never
               : NonNullable<A[K]> extends Array<any>
-              ? ExtractArray<A[K], `${Base}.${IsArray<A> extends true ? ArrayItem : K}`, Prev[Depth]>
+              ? ExtractArrayPaths<
+                    A[K],
+                    `${Base}.${IsArray<A> extends true ? ArrayItem<ArrKeyPath> : K}`,
+                    ArrKeyPath,
+                    Prev[Depth]
+                >
               : NonNullable<A[K]> extends Record<keyof any, unknown>
-              ? `${Base}.${IsArray<A> extends true ? ArrayItem : K}.${ObjectKeyPaths<A[K]>}`
+              ? `${Base}.${IsArray<A> extends true ? ArrayItem<ArrKeyPath> : K}.${ExtractKeyPaths<
+                    NonNullable<A[K]>,
+                    ArrKeyPath
+                >}`
               : never);
 }[number];
 
@@ -88,7 +106,7 @@ type ExtractArray<A extends Array<any>, Base extends string, Depth extends Prev[
 type Prev = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 /** Placeholder for array index. */
-type ArrayItem<ArrayPathKey extends string = DefaultArrayPathKey> = ArrayPathKey | number;
+type ArrayItem<ArrayPathKey> = ([ArrayPathKey] extends [never] ? DefaultArrayPathKey : ArrayPathKey) | number;
 type IsArray<T> = T extends Array<any> ? (T extends any[] ? (T extends [any, ...any[]] ? false : true) : false) : false;
 
 /************************/
@@ -126,11 +144,58 @@ export type UnwrapZodType<T extends z.ZodType> = T extends { unwrap: () => infer
 
 /************************/
 /************************/
-/***     DEFAULT      ***/
+/***     INDEXES      ***/
+/************************/
+/************************/
+/**
+ * Extended `CreateIndexesOptions` that supports model key paths for `wildcardProjection`.
+ *
+ * Allows inclusion or exclusion of specific fields using 0 or 1, with optional `_id` inclusion.
+ */
+export type MGCreateIndexesOptions<T extends Record<keyof any, unknown>> = Omit<
+    CreateIndexesOptions,
+    "wildcardProjection"
+> & {
+    wildcardProjection?: { [K in RemoveWildcardPaths<KeyPathsWithWildcard<T>>]?: 0 | 1 } & { _id?: 1 };
+};
+
+/** Extended `IndexDescription` that support model key paths for `key` and `wildcardProjection`. */
+export type MGIndexDescription<T extends Record<keyof any, unknown>> = Omit<
+    IndexDescription,
+    "key" | "wildcardProjection"
+> & {
+    key: MGIndexSpecification<T>;
+    wildcardProjection?: { [K in RemoveWildcardPaths<KeyPathsWithWildcard<T>>]?: 0 | 1 } & { _id?: 1 };
+};
+
+/** Defines the index direction for each specified key path within the model. */
+export type MGIndexSpecification<T extends Record<keyof any, unknown>> = {
+    [K in KeyPathsWithWildcard<T>]?: IndexDirection;
+};
+
+type KeyPathsWithWildcard<O extends Record<keyof any, unknown>> = RemoveInvalidWildcardPaths<
+    ExtractKeyPaths<O, WildcardIndexMap>
+>;
+
+type RemoveWildcardPaths<T extends string> = T extends `${infer _}${WildcardIndexMap}${infer __}` ? never : T;
+
+type RemoveInvalidWildcardPaths<T extends string> =
+    T extends `${infer _}${WildcardIndexMap}${infer __}${WildcardIndexMap}${infer ___}`
+        ? never
+        : T extends `${infer A}.${WildcardIndexMap}.${infer B}`
+        ? `${A}.${B}`
+        : T;
+
+/************************/
+/************************/
+/***    CONSTANTS     ***/
 /************************/
 /************************/
 type DefaultArrayPathKey = typeof DEFAULT_PATH_OPTIONS.DEFAULT_ARRAY_PATH_KEY;
 type DefaultArrayPathLength = typeof DEFAULT_PATH_OPTIONS.DEFAULT_ARRAY_PATH_LENGTH;
+
+type WildcardIndexMap = (typeof WILDCARD_INDEX_MAP)[keyof typeof WILDCARD_INDEX_MAP];
+type PositionalOperatorMap = (typeof POSITIONAL_OPERATOR_MAP)[keyof typeof POSITIONAL_OPERATOR_MAP];
 
 /************************/
 /************************/
