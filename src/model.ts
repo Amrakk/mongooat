@@ -1,17 +1,41 @@
-import { ZodObject, ZodRawShape } from "zod";
+import mongo from "mongodb";
 import { deleteField } from "./helpers/deleteField.js";
 import { validateSchema } from "./helpers/validateSchema.js";
 import { DefaultModelOptions, ModelOptions } from "./options/modelOptions.js";
 import { createSchemaFromData, createSchemaFromPaths } from "./helpers/generateSchema.js";
-import mongo, { Collection, Db, Filter, ModifyResult, OptionalUnlessRequiredId } from "mongodb";
 import { processUndefinedFieldsForUpdate, removeUndefinedFields } from "./helpers/processUndefindedFields.js";
 
 import ValidateError from "./error/validate.js";
 import MissingModelNameError from "./error/model/missingModelName.js";
 import IdFieldNotAllowedError from "./error/model/idFieldNotAllowed.js";
 
+import type { ZodObject, ZodRawShape } from "zod";
 import type { ParseOptions } from "./options/parseOptions.js";
-import type { DeepPartial, IdField, ObjectKeyPaths, OmitId } from "./types.js";
+import type {
+    OmitId,
+    IdField,
+    DeepPartial,
+    ObjectKeyPaths,
+    MGIndexDescription,
+    MGIndexSpecification,
+    MGCreateIndexesOptions,
+} from "./types.js";
+import type {
+    Db,
+    BSON,
+    Filter,
+    Collection,
+    ModifyResult,
+    IndexDescription,
+    ListIndexesCursor,
+    DropIndexesOptions,
+    IndexSpecification,
+    ListIndexesOptions,
+    OptionalUnlessRequiredId,
+    ListSearchIndexesOptions,
+    ListSearchIndexesCursor,
+    SearchIndexDescription,
+} from "mongodb";
 
 /** Extracts the type of a model instance. */
 export type TypeOf<T extends Model<any, any>> = T["_type"];
@@ -155,6 +179,188 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
 
     /************************/
     /************************/
+    /***     INDEXES      ***/
+    /************************/
+    /************************/
+    /**
+     * Lists the indexes in the collection.
+     *
+     * @param {ListIndexesOptions} options - Optional settings for the listIndexes operation. Learn more at
+     *                                       {@link https://mongodb.github.io/node-mongodb-native/6.7/types/ListIndexesOptions.html this}.
+     *
+     * @returns {Promise<ListIndexesCursor>} A promise that resolves to a cursor for the list of indexes.
+     *
+     * @example
+     * // List all indexes in the user collection.
+     * const indexes = await UserModel.listIndexes();
+     * for await (const index of indexes) {
+     *  console.log(index);
+     * }
+     */
+    public listIndexes(options?: ListIndexesOptions): ListIndexesCursor {
+        return this.collection.listIndexes(options);
+    }
+
+    /**
+     * Creates one or more indexes in the collection.
+     *
+     * **Note:** Wildcard index suggestions `$**` will be available in the key paths. Learn more at
+     *           {@link https://www.mongodb.com/docs/manual/core/indexes/index-types/index-wildcard/ this}.
+     *
+     * @param {MGIndexDescription[]} indexes - An array of index specifications to create in the collection.
+     * @param {MGCreateIndexesOptions<Type>} options - Optional settings for the createIndexes operation. Learn more at
+     *                                                 {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/CreateIndexesOptions.html this}.
+     *
+     * @returns {Promise<string[]>} A promise that resolves to an array of index names that were created.
+     *
+     * @example
+     * // Create a unique index on the email field in the user collection.
+     * const indexNames = await UserModel.createIndexes([{ key: { email: 1 }, unique: true }]);
+     */
+    public createIndexes(
+        indexes: MGIndexDescription<Type>[],
+        options?: MGCreateIndexesOptions<Type>
+    ): Promise<string[]> {
+        return this.collection.createIndexes(removeUndefinedFields(indexes) as IndexDescription[], options);
+    }
+
+    /**
+     * Creates a single index in the collection.
+     *
+     * **Note:** Wildcard index suggestions `$**` will be available in the key paths. Learn more at
+     *           {@link https://www.mongodb.com/docs/manual/core/indexes/index-types/index-wildcard/ this}.
+     *
+     * @param {MGIndexSpecification} index - The index specification to create in the collection.
+     * @param {MGCreateIndexesOptions<Type>} options - Optional settings for the createIndex operation. Learn more at
+     *                                                 {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/CreateIndexesOptions.html this}.
+     *
+     * @returns {Promise<string>} A promise that resolves to the name of the index that was created.
+     *
+     * @example
+     * // Create a unique index on the email field in the user collection.
+     * const indexName = await UserModel.createIndex({ key: { email: 1 }, unique: true });
+     */
+    public createIndex(index: MGIndexSpecification<Type>, options?: MGCreateIndexesOptions<Type>): Promise<string> {
+        return this.collection.createIndex(removeUndefinedFields(index) as IndexSpecification, options);
+    }
+
+    /**
+     * Drops an index from the collection.
+     *
+     * @param {string} indexName - The name of the index to drop.
+     * @param {DropIndexesOptions} options - Optional settings for the dropIndexes operation. Learn more at
+     *                                       {@link https://mongodb.github.io/node-mongodb-native/6.7/types/DropIndexesOptions.html this}.
+     *
+     * @returns {Promise<BSON.Document>} A promise that resolves to the result of the dropIndexes operation.
+     *
+     * @example
+     * // Drop the unique index on the email field in the user collection.
+     * const result = await UserModel.dropIndex("email_1");
+     */
+    public dropIndex(indexName: string, options?: DropIndexesOptions): Promise<BSON.Document> {
+        return this.collection.dropIndex(indexName, options);
+    }
+
+    /**
+     * Drops all indexes from the collection.
+     *
+     * @param {DropIndexesOptions} options - Optional settings for the dropIndexes operation. Learn more at
+     *                                       {@link https://mongodb.github.io/node-mongodb-native/6.7/types/DropIndexesOptions.html this}.
+     *
+     * @returns {Promise<boolean>} A promise that resolves to the result of the dropIndexes operation.
+     *
+     * @example
+     * // Drop all indexes from the user collection.
+     * const result = await UserModel.dropIndexes();
+     */
+    public dropIndexes(options?: DropIndexesOptions): Promise<boolean> {
+        return this.collection.dropIndexes(options);
+    }
+
+    /**
+     * Lists the search indexes in the collection.
+     *
+     * @param {string} name - The name of the index to search for.
+     * @param {ListSearchIndexesOptions} options - Optional settings for the listSearchIndexes operation. Learn more at
+     *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/types/ListSearchIndexesOptions.html this}.
+     *
+     * @returns {ListSearchIndexesCursor} A cursor for the list of search indexes.
+     *
+     * @example
+     * // List all search indexes in the user collection.
+     * const indexes = UserModel.listSearchIndexes();
+     * for await (const index of indexes) {
+     *  console.log(index);
+     * }
+     */
+    public listSearchIndexes(options?: ListSearchIndexesOptions): ListSearchIndexesCursor;
+    public listSearchIndexes(name: string, options?: ListSearchIndexesOptions): ListSearchIndexesCursor;
+    public listSearchIndexes(
+        nameOrOptions?: string | ListSearchIndexesOptions,
+        options?: ListSearchIndexesOptions
+    ): ListSearchIndexesCursor {
+        if (typeof nameOrOptions === "string") return this.collection.listSearchIndexes(nameOrOptions, options);
+        else if (typeof nameOrOptions === "object") return this.collection.listSearchIndexes(nameOrOptions);
+
+        return this.collection.listSearchIndexes(options);
+    }
+
+    /**
+     * Creates a search index in the collection.
+     *
+     * @param {SearchIndexDescription} description - The description of the search index to create. Learn more at
+     *                                               {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/SearchIndexDescription.html this}.
+     *
+     * @returns {Promise<string>} A promise that resolves to the name of the search index that was created.
+     *
+     * @todo implement type for description
+     */
+    public createSearchIndex(description: SearchIndexDescription): Promise<string> {
+        return this.collection.createSearchIndex(description);
+    }
+
+    /**
+     * Creates multiple search indexes in the collection.
+     *
+     * @param {SearchIndexDescription[]} descriptions - An array of search index descriptions to create in the collection. Learn more at
+     *                                                  {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/SearchIndexDescription.html this}.
+     *
+     * @returns {Promise<string[]>} A promise that resolves to an array of search index names that were created.
+     *
+     * @todo implement type for description
+     */
+    public createSearchIndexes(descriptions: SearchIndexDescription[]): Promise<string[]> {
+        return this.collection.createSearchIndexes(descriptions);
+    }
+
+    /**
+     * Updates a search index in the collection.
+     *
+     * @param {string} name - The name of the search index to update.
+     * @param {BSON.Document} definition - The updated definition of the search index.
+     *
+     *
+     * @returns {Promise<void>} A promise that resolves when the search index is updated.
+     *
+     * @todo implement type for definition
+     */
+    public updateSearchIndex(name: string, definition: BSON.Document): Promise<void> {
+        return this.collection.updateSearchIndex(name, definition);
+    }
+
+    /**
+     * Drops a search index from the collection.
+     *
+     * @param {string} name - The name of the search index to drop.
+     *
+     * @returns {Promise<void>} A promise that resolves when the search index is dropped.
+     */
+    public dropSearchIndex(name: string): Promise<void> {
+        return this.collection.dropSearchIndex(name);
+    }
+
+    /************************/
+    /************************/
     /***       CRUD       ***/
     /************************/
     /************************/
@@ -196,6 +402,9 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
 
     /**
      * Finds a document in the collection by its ID and updates it.
+     *
+     * **Note:** By default, this operation uses the `$set` operator. If you assign `undefined` to a field,
+     * it will be removed from the document (using the `unset` operator) rather than being set to `null` (as MongoDB's default behavior).
      *
      * @param {IdField<Type>} id - The ID of the document to find and update.
      * @param {UpdateType<Type>} update - The update to apply to the document.
@@ -322,6 +531,9 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
 
     /**
      * Finds a document in the collection that match the specified filter criteria and updates it.
+     *
+     * **Note:** By default, this operation uses the `$set` operator. If you assign `undefined` to a field,
+     * it will be removed from the document (using the `unset` operator) rather than being set to `null` (as MongoDB's default behavior).
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the document.
@@ -550,6 +762,9 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
     /**
      * Updates a single document in the collection that matches the given filter criteria.
      *
+     * **Note:** By default, this operation uses the `$set` operator. If you assign `undefined` to a field,
+     * it will be removed from the document (using the `unset` operator) rather than being set to `null` (as MongoDB's default behavior).
+     *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the document.
      * @param {mongo.UpdateOptions} options - Optional settings for the update operation. Learn more at
@@ -571,6 +786,9 @@ export class Model<Type extends Record<keyof any, unknown>, SchemaType extends Z
 
     /**
      * Updates multiple documents in the collection that match the given filter criteria.
+     *
+     * **Note:** By default, this operation uses the `$set` operator. If you assign `undefined` to a field,
+     * it will be removed from the document (using the `unset` operator) rather than being set to `null` (as MongoDB's default behavior).
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the documents to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the documents.
