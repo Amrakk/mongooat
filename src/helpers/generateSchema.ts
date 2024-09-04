@@ -8,7 +8,7 @@ import { deleteZodField } from "./deleteField.js";
  */
 export function createSchemaFromData<ST extends z.ZodRawShape>(
     schema: z.ZodObject<ST>,
-    data: Record<keyof any, unknown>
+    data: Record<string | number, unknown>
 ): z.ZodObject<ST> {
     const newShape: z.ZodRawShape = {};
 
@@ -35,7 +35,7 @@ export function createSchemaFromData<ST extends z.ZodRawShape>(
  * Generate a new partial schema based on the original schema and the paths provided.
  * @todo evaluate with others zod types
  */
-export function createSchemaFromPaths<T extends Record<keyof any, unknown>, ST extends z.ZodRawShape>(
+export function createSchemaFromPaths<T extends Record<string | number, unknown>, ST extends z.ZodRawShape>(
     schema: z.ZodObject<ST>,
     paths: ObjectKeyPaths<T>[]
 ): z.ZodObject<any> {

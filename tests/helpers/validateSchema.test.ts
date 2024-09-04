@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { assert } from "chai";
 import { ZodObjectId } from "../../src/schemas/objectid.js";
-import { DEFAULT_ARRAY_PATH_KEY } from "../../src/constants.js";
+import { DEFAULT_ARRAY_PLACEHOLDER } from "../../src/constants.js";
 import { assertErrorInstance } from "../utils/assertErrorInstance.js";
 import { validateSchema } from "../../src/helpers/validateSchema.js";
 import InvalidSchemaError from "../../src/error/model/invalidSchema.js";
@@ -177,7 +177,7 @@ describe("helpers.validateSchema", () => {
                 () => validateSchema(schema, "test"),
                 new InvalidSchemaError("test", [
                     {
-                        path: `tags.${DEFAULT_ARRAY_PATH_KEY}.relevance`,
+                        path: `tags.${DEFAULT_ARRAY_PLACEHOLDER}.relevance`,
                         reason: `Schema type 'ZodPromise' is not allowed.`,
                     },
                 ])
@@ -202,7 +202,7 @@ describe("helpers.validateSchema", () => {
                 () => validateSchema(schema, "test"),
                 new InvalidSchemaError("test", [
                     {
-                        path: `categories.${DEFAULT_ARRAY_PATH_KEY}.tags.${DEFAULT_ARRAY_PATH_KEY}.relevance`,
+                        path: `categories.${DEFAULT_ARRAY_PLACEHOLDER}.tags.${DEFAULT_ARRAY_PLACEHOLDER}.relevance`,
                         reason: `Schema type 'ZodPromise' is not allowed.`,
                     },
                 ])
@@ -224,7 +224,7 @@ describe("helpers.validateSchema", () => {
                 () => validateSchema(schema, "test"),
                 new InvalidSchemaError("test", [
                     {
-                        path: `tags.${DEFAULT_ARRAY_PATH_KEY}.${DEFAULT_ARRAY_PATH_KEY}.relevance`,
+                        path: `tags.${DEFAULT_ARRAY_PLACEHOLDER}.${DEFAULT_ARRAY_PLACEHOLDER}.relevance`,
                         reason: `Schema type 'ZodPromise' is not allowed.`,
                     },
                 ])

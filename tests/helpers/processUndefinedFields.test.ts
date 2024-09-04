@@ -187,5 +187,103 @@ describe("helpers.processUndefinedFields", () => {
             const result = removeUndefinedFields(data);
             assert.deepEqual(result, { name: "John", tags: [{ name: "tag1" }, { name: "tag2", value: 5 }] });
         });
+
+        it("should remove undefined fields from array", () => {
+            const data = ["apple", undefined, "banana", undefined];
+            const result = removeUndefinedFields(data);
+            assert.deepEqual(result, ["apple", "banana"]);
+        });
+
+        it("should remove undefined fields from deeply nested arrays", () => {
+            const data = [
+                {
+                    name: "item1",
+                    tags: [
+                        { name: "tag1", value: undefined },
+                        { name: "tag2", value: 5 },
+                    ],
+                },
+                {
+                    name: "item2",
+                    tags: [
+                        { name: "tag3", value: 10 },
+                        { name: "tag4", value: undefined },
+                    ],
+                },
+            ];
+            const result = removeUndefinedFields(data);
+            assert.deepEqual(result, [
+                { name: "item1", tags: [{ name: "tag1" }, { name: "tag2", value: 5 }] },
+                { name: "item2", tags: [{ name: "tag3", value: 10 }, { name: "tag4" }] },
+            ]);
+        });
+        it("should handle array of primitives with undefined values", () => {
+            const data = [undefined, 1, undefined, 2, 3, undefined];
+            const result = removeUndefinedFields(data);
+            assert.deepEqual(result, [1, 2, 3]);
+        });
+
+        it("should handle array of objects with undefined fields", () => {
+            const data = [
+                { name: "Alice", age: undefined },
+                { name: "Bob", age: 30 },
+                { name: "Charlie", age: undefined },
+            ];
+            const result = removeUndefinedFields(data);
+            assert.deepEqual(result, [{ name: "Alice" }, { name: "Bob", age: 30 }, { name: "Charlie" }]);
+        });
+
+        it("should handle deeply nested arrays with mixed types", () => {
+            const data = [
+                {
+                    id: 1,
+                    values: [
+                        { key: "a", value: undefined },
+                        { key: "b", value: "foo" },
+                    ],
+                },
+                {
+                    id: 2,
+                    values: [undefined, { key: "c", value: "bar" }],
+                },
+            ];
+            const result = removeUndefinedFields(data);
+            assert.deepEqual(result, [
+                {
+                    id: 1,
+                    values: [{ key: "a" }, { key: "b", value: "foo" }],
+                },
+                {
+                    id: 2,
+                    values: [{ key: "c", value: "bar" }],
+                },
+            ]);
+        });
+
+        it("should handle deeply nested arrays with undefined values", () => {
+            const data = [
+                [undefined, 1, 2],
+                [3, undefined, 4],
+                [5, 6, undefined],
+            ];
+            const result = removeUndefinedFields(data);
+            assert.deepEqual(result, [
+                [1, 2],
+                [3, 4],
+                [5, 6],
+            ]);
+        });
+
+        it("should handle an array with all elements undefined", () => {
+            const data = [undefined, undefined, undefined];
+            const result = removeUndefinedFields(data);
+            assert.deepEqual(result, []);
+        });
+
+        it("should handle empty array", () => {
+            const data: unknown[] = [];
+            const result = removeUndefinedFields(data);
+            assert.deepEqual(result, []);
+        });
     });
 });

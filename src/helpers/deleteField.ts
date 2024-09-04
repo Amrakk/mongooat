@@ -1,4 +1,4 @@
-import { DEFAULT_ARRAY_PATH_KEY } from "../constants.js";
+import { DEFAULT_ARRAY_PLACEHOLDER } from "../constants.js";
 import { ZodArray, ZodObject, ZodTypeAny } from "zod";
 
 /**
@@ -7,16 +7,14 @@ import { ZodArray, ZodObject, ZodTypeAny } from "zod";
  * **Note:**
  * - This function does not support maps, sets, and records.
  *
- * @todo
- * - Add support for maps, sets, and records.
- * - Test with nested unions, intersections, and discriminated unions.
+ * @todo Test with nested unions, intersections, and discriminated unions.
  */
-export function deleteField(obj: Record<keyof any, any>, path: string): void {
+export function deleteField(obj: Record<string | number, unknown>, path: string): void {
     const keys = path.split(".");
     let current: any = obj;
 
     for (let i = 0; i < keys.length - 1; i++) {
-        if (keys[i] === DEFAULT_ARRAY_PATH_KEY && Array.isArray(current))
+        if (keys[i] === DEFAULT_ARRAY_PLACEHOLDER && Array.isArray(current))
             return current.forEach((item: any) => deleteField(item, keys.slice(i + 1).join(".")));
         if (current[keys[i]] === undefined) return;
         current = current[keys[i]];
@@ -26,7 +24,7 @@ export function deleteField(obj: Record<keyof any, any>, path: string): void {
 
     if (!isNaN(index) && Array.isArray(current)) {
         if (index >= 0 && index < current.length) current.splice(index, 1);
-    } else if (lastKey === DEFAULT_ARRAY_PATH_KEY && Array.isArray(current)) {
+    } else if (lastKey === DEFAULT_ARRAY_PLACEHOLDER && Array.isArray(current)) {
         current.splice(0, current.length);
     } else {
         delete current[lastKey];
@@ -40,16 +38,14 @@ export function deleteField(obj: Record<keyof any, any>, path: string): void {
  * - This function does not support maps, sets, and records.
  * - Except for `ZodObject` and `ZodArray`, this does not yet apply to verifying nested schemas.
  *
- * @todo
- * - Add support for maps, sets, and records.
- * - Test with nested unions, intersections, and discriminated unions.
+ * @todo Test with nested unions, intersections, and discriminated unions.
  */
 export function deleteZodField(schema: ZodTypeAny, path: string): void {
     const keys = path.split(".");
     let current: ZodTypeAny = schema;
 
     for (let i = 0; i < keys.length - 1; i++) {
-        if (keys[i] === DEFAULT_ARRAY_PATH_KEY && current instanceof ZodArray)
+        if (keys[i] === DEFAULT_ARRAY_PLACEHOLDER && current instanceof ZodArray)
             return deleteZodField(current.element, keys.slice(i + 1).join("."));
         if (current instanceof ZodObject) {
             const originalShape = current.shape;
@@ -64,4 +60,8 @@ export function deleteZodField(schema: ZodTypeAny, path: string): void {
     } else if (current instanceof ZodArray) {
         deleteZodField(current.element, lastKey);
     }
+
+    // else if (lastKey === DEFAULT_ARRAY_PLACEHOLDER && current instanceof ZodArray) {
+    //     current = z.array(z.any());
+    // }
 }

@@ -11,8 +11,8 @@ import { DeepPartial } from "../types.js";
  * - `set`: A deep partial clone of the input data with undefined fields removed.
  * - `unset`: A record of fields (in dot-notation) that had undefined values.
  */
-export function processUndefinedFieldsForUpdate<T extends Record<keyof any, any>>(data: T) {
-    const unset: Record<keyof any, any> = {};
+export function processUndefinedFieldsForUpdate<T extends Record<string | number, unknown>>(data: T) {
+    const unset: Record<string | number, unknown> = {};
 
     const buildUnsetMap = (obj: any, parentKey: string = "") => {
         for (const key in obj) {
@@ -46,23 +46,31 @@ export function processUndefinedFieldsForUpdate<T extends Record<keyof any, any>
  * @param data - The document to process, which may contain nested objects and arrays.
  * @returns The input document with all undefined fields removed, retaining the original structure.
  */
-export function removeUndefinedFields<T extends Record<keyof any, any>>(data: T): DeepPartial<T> {
+export function removeUndefinedFields<T extends Record<string | number, unknown> | Array<unknown>>(
+    data: T
+): DeepPartial<T> {
     const cleanObject = (obj: any) => {
-        for (const key in obj) {
-            if (obj[key] === undefined) {
-                delete obj[key];
-            } else if (typeof obj[key] === "object" && obj[key] !== null) {
-                if (Array.isArray(obj[key])) {
-                    obj[key] = obj[key].filter((item: any) => item !== undefined);
-                    obj[key].forEach(cleanObject);
-                } else {
-                    cleanObject(obj[key]);
+        if (Array.isArray(obj)) {
+            obj = obj
+                .filter((item) => item !== undefined)
+                .map((item) => {
+                    if (typeof item === "object" && item !== null) {
+                        return cleanObject(item);
+                    }
+                    return item;
+                });
+        } else if (typeof obj === "object" && obj !== null) {
+            for (const key in obj) {
+                if (obj[key] === undefined) {
+                    delete obj[key];
+                } else if (typeof obj[key] === "object" && obj[key] !== null) {
+                    obj[key] = cleanObject(obj[key]);
                     if (Object.keys(obj[key]).length === 0) delete obj[key];
                 }
             }
         }
+        return obj;
     };
 
-    cleanObject(data);
-    return data;
+    return cleanObject(data);
 }

@@ -1,12 +1,13 @@
 import { Model } from "./model.js";
-import { ZodObject, ZodRawShape, z } from "zod";
-import { ModelOptions } from "./options/modelOptions.js";
-import { Db, DbOptions, MongoClient, MongoClientOptions } from "mongodb";
+import { MongoClient } from "mongodb";
 
 import DBNotSetError from "./error/dbNotSet.js";
 
 import type { ValidSchemaType } from "./types.js";
 import type { TypeOf, GetPaths } from "./model.js";
+import type { ZodObject, ZodRawShape, z } from "zod";
+import type { ModelOptions } from "./options/modelOptions.js";
+import type { BSON, Collection, CreateCollectionOptions, Db, DbOptions, MongoClientOptions } from "mongodb";
 
 // type infer, paths inspired by Zod
 namespace Mongooat {
@@ -93,6 +94,23 @@ class Mongooat {
             .listCollections(undefined, { nameOnly: true })
             .toArray()
             .then((cols) => cols.map((col) => col.name));
+    }
+
+    /**
+     * Creates a new collection in the database with the specified name and options.
+     *
+     * @param {string} name - The name of the collection to create.
+     * @param {CreateCollectionOptions} options - Optional settings for the createCollection operation. Learn more at
+     *                                            {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/CreateCollectionOptions.html this}.
+     *
+     * @returns {Promise<Collection<Type>>} A promise that resolves when the collection is created.
+     */
+    public async createCollection<Type extends BSON.Document>(
+        name: string,
+        options?: CreateCollectionOptions
+    ): Promise<Collection<Type>> {
+        if (!this._currDb) throw new DBNotSetError();
+        return await this._currDb.createCollection<Type>(name, options);
     }
 
     /** Close the connection to the MongoDB server. */

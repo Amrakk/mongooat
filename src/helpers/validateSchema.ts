@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { InvalidSchemaMap } from "../types.js";
 import InvalidSchemaError from "../error/model/invalidSchema.js";
-import { DEFAULT_ARRAY_PATH_KEY, INVALID_ID_ZOD_TYPES, INVALID_ZOD_TYPES } from "../constants.js";
+import { DEFAULT_ARRAY_PLACEHOLDER, INVALID_ID_ZOD_TYPES, INVALID_ZOD_TYPES } from "../constants.js";
 
 /**
  * Validates a Zod schema to ensure it is compatible with MongoDB document structures.
@@ -28,7 +28,7 @@ export function validateSchema<T extends z.ZodRawShape>(zod: z.ZodObject<T>, mod
             const schema = zod.shape;
             for (let key of Object.keys(schema)) processSchema(schema[key], `${path ? path + "." : ""}${key}`);
         } else if (zod instanceof z.ZodArray) {
-            processSchema(zod.element, `${path ? path + "." : ""}${DEFAULT_ARRAY_PATH_KEY}`);
+            processSchema(zod.element, `${path ? path + "." : ""}${DEFAULT_ARRAY_PLACEHOLDER}`);
         } else {
             const baseSchema = getBaseSchema(zod);
             if (!(baseSchema instanceof z.ZodType) || isInvalidField(baseSchema)) {
