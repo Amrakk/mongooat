@@ -17,23 +17,20 @@ export function processUndefinedFieldsForUpdate<T extends Record<string | number
     const buildUnsetMap = (obj: any, parentKey: string = "") => {
         for (const key in obj) {
             const fullKey = parentKey ? `${parentKey}.${key}` : key;
-            if (obj[key] === undefined) {
-                unset[fullKey] = "";
-            } else if (typeof obj[key] === "object" && obj[key] !== null) {
+            if (obj[key] === undefined) unset[fullKey] = "";
+            else if (typeof obj[key] === "object" && obj[key] !== null) {
                 if (Array.isArray(obj[key])) {
                     obj[key].forEach((item: any, index: number) => {
                         buildUnsetMap(item, `${fullKey}.${index}`);
                     });
-                } else {
-                    buildUnsetMap(obj[key], fullKey);
-                }
+                } else buildUnsetMap(obj[key], fullKey);
             }
         }
     };
 
     buildUnsetMap(data);
 
-    const set = removeUndefinedFields(structuredClone(data));
+    let set = removeEmptyObjects(removeUndefinedFields(structuredClone(data))) as DeepPartial<T>;
     return { set, unset };
 }
 
@@ -46,9 +43,7 @@ export function processUndefinedFieldsForUpdate<T extends Record<string | number
  * @param data - The document to process, which may contain nested objects and arrays.
  * @returns The input document with all undefined fields removed, retaining the original structure.
  */
-export function removeUndefinedFields<T extends Record<string | number, unknown> | Array<unknown>>(
-    data: T
-): DeepPartial<T> {
+export function removeUndefinedFields<T extends Record<string | number, unknown> | Array<unknown>>(data: T): T {
     const cleanObject = (obj: any) => {
         if (Array.isArray(obj)) {
             obj = obj
@@ -61,16 +56,29 @@ export function removeUndefinedFields<T extends Record<string | number, unknown>
                 });
         } else if (typeof obj === "object" && obj !== null) {
             for (const key in obj) {
-                if (obj[key] === undefined) {
-                    delete obj[key];
-                } else if (typeof obj[key] === "object" && obj[key] !== null) {
-                    obj[key] = cleanObject(obj[key]);
-                    if (Object.keys(obj[key]).length === 0) delete obj[key];
-                }
+                if (obj[key] === undefined) delete obj[key];
+                else if (typeof obj[key] === "object" && obj[key] !== null) obj[key] = cleanObject(obj[key]);
             }
         }
         return obj;
     };
 
     return cleanObject(data);
+}
+
+// Utility function to check if a value is a plain object (not a special object like Date, RegExp, etc.)
+function isPlainObject(value: unknown): value is Record<string | number, unknown> {
+    return Object.prototype.toString.call(value) === "[object Object]";
+}
+
+function removeEmptyObjects<T extends Record<string | number, unknown>>(obj: T): T {
+    for (const key in obj) {
+        const value = obj[key];
+
+        if (isPlainObject(value)) {
+            obj[key] = removeEmptyObjects(value);
+            if (Object.keys(obj[key] as object).length === 0) delete obj[key];
+        }
+    }
+    return obj;
 }
