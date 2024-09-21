@@ -216,6 +216,19 @@ type ResolvePrimitive<O, Key extends keyof O> = O[Key];
 /***       ZOD        ***/
 /************************/
 /************************/
+/** Assigns optional for keys wrapped with ZodDefault */
+type InferShape<T extends z.ZodTypeAny> = T extends z.ZodObject<infer S extends z.ZodRawShape>
+    ? OptionalDefaults<S>
+    : T extends z.ZodArray<infer E>
+    ? Array<E extends z.ZodObject<infer S extends z.ZodRawShape> ? OptionalDefaults<S> : z.infer<E>>
+    : z.infer<T>;
+
+export type OptionalDefaults<T extends z.ZodRawShape> = {
+    [K in keyof T as T[K] extends z.ZodDefault<any> | z.ZodOptional<any> ? never : K]: InferShape<T[K]>;
+} & {
+    [K in keyof T as T[K] extends z.ZodDefault<any> | z.ZodOptional<any> ? K : never]?: InferShape<T[K]>;
+};
+
 /**
  * Ensures that the `_id` field is not an `array`, `tuple`, `undefined` or `unknown` type.
  *

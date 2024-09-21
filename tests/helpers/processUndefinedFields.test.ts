@@ -1,5 +1,5 @@
 import { assert } from "chai";
-import { processUndefinedFieldsForUpdate, removeUndefinedFields } from "../../src/helpers/processUndefindedFields.js";
+import { processUndefinedFieldsForUpdate, removeUndefinedFields } from "../../src/helpers/processUndefinedFields.js";
 
 describe("helpers.processUndefinedFields", () => {
     /**
@@ -13,7 +13,7 @@ describe("helpers.processUndefinedFields", () => {
         });
 
         it("should process object with undefined fields", () => {
-            const data = { name: "John", age: undefined };
+            const data: any = { name: "John", age: undefined };
             const result = processUndefinedFieldsForUpdate(data);
             assert.deepEqual(result, { set: { name: "John" }, unset: { age: "" } });
         });
@@ -55,6 +55,16 @@ describe("helpers.processUndefinedFields", () => {
             const data = { profile: { age: undefined } };
             const result = processUndefinedFieldsForUpdate(data);
             assert.deepEqual(result, { set: {}, unset: { "profile.age": "" } });
+        });
+
+        it("should correctly remove empty objects", () => {
+            const date = new Date();
+            const data = { profile: { age: undefined, details: {}, date } };
+            const result = processUndefinedFieldsForUpdate(data);
+            assert.deepEqual(result, {
+                set: { profile: { date } },
+                unset: { "profile.age": "" },
+            });
         });
 
         it("should handle arrays correctly when processing undefined fields", () => {
@@ -238,7 +248,7 @@ describe("helpers.processUndefinedFields", () => {
                 {
                     id: 1,
                     values: [
-                        { key: "a", value: undefined },
+                        { key: "a", value: undefined } as { key: string; value?: number },
                         { key: "b", value: "foo" },
                     ],
                 },
