@@ -24,7 +24,12 @@ describe("helpers.validateSchema", () => {
                 _id: ZodObjectId.optional(),
                 name: z.string(),
             });
-            assert.doesNotThrow(() => validateSchema(schema, "test"));
+            assertErrorInstance(
+                () => validateSchema(schema, "test"),
+                new InvalidSchemaError("test", [
+                    { path: "_id", reason: "The '_id' field must not be an 'ZodOptional' type." },
+                ])
+            );
         });
 
         it("should not throw InvalidSchemaError when the '_id' field is a nullable valid Zod type", () => {
@@ -56,6 +61,7 @@ describe("helpers.validateSchema", () => {
             assertErrorInstance(
                 () => validateSchema(schema, "test"),
                 new InvalidSchemaError("test", [
+                    { path: "_id", reason: "The '_id' field must not be an 'ZodOptional' type." },
                     { path: "_id", reason: "The '_id' field must not be an 'ZodArray' type." },
                 ])
             );

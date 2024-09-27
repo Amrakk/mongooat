@@ -51,7 +51,6 @@ export function removeUndefinedFields<T extends Record<string | number, unknown>
             obj = obj
                 .filter((item) => item !== undefined)
                 .map((item) => {
-                    console.log("item", item);
                     if (typeof item === "object" && item !== null) {
                         return cleanObject(item);
                     }
