@@ -1,4 +1,5 @@
-import { DeepPartial } from "../types.js";
+import { clone } from "./clone.js";
+import type { DeepPartial } from "../types.js";
 
 /**
  * Processes a document by identifying fields that are undefined and preparing it for MongoDB update operations.
@@ -30,7 +31,8 @@ export function processUndefinedFieldsForUpdate<T extends Record<string | number
 
     buildUnsetMap(data);
 
-    let set = removeEmptyObjects(removeUndefinedFields(structuredClone(data))) as DeepPartial<T>;
+    const cloneData = clone(data);
+    let set = removeEmptyObjects(removeUndefinedFields(cloneData)) as DeepPartial<T>;
     return { set, unset };
 }
 
@@ -44,11 +46,12 @@ export function processUndefinedFieldsForUpdate<T extends Record<string | number
  * @returns The input document with all undefined fields removed, retaining the original structure.
  */
 export function removeUndefinedFields<T extends Record<string | number, unknown> | Array<unknown>>(data: T): T {
-    const cleanObject = (obj: any) => {
+    const cleanObject = (obj: any): any => {
         if (Array.isArray(obj)) {
             obj = obj
                 .filter((item) => item !== undefined)
                 .map((item) => {
+                    console.log("item", item);
                     if (typeof item === "object" && item !== null) {
                         return cleanObject(item);
                     }
@@ -57,7 +60,10 @@ export function removeUndefinedFields<T extends Record<string | number, unknown>
         } else if (typeof obj === "object" && obj !== null) {
             for (const key in obj) {
                 if (obj[key] === undefined) delete obj[key];
-                else if (typeof obj[key] === "object" && obj[key] !== null) obj[key] = cleanObject(obj[key]);
+                else if (typeof obj[key] === "object" && obj[key] !== null) {
+                    if (Array.isArray(obj[key])) obj[key] = cleanObject(obj[key]);
+                    else cleanObject(obj[key]);
+                }
             }
         }
         return obj;

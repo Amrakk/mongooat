@@ -1,7 +1,7 @@
 import type { z } from "zod";
+import type MongooatError from "./error/mongooatError.js";
 import type { BulkWriteResult, CreateIndexesOptions, IndexDescription, IndexDirection } from "mongodb";
 import type { DEFAULT_PATH_OPTIONS, POSITIONAL_OPERATOR_MAP, WILDCARD_INDEX_MAP } from "./constants.js";
-import MongooatError from "./error/mongooatError.js";
 
 /************************/
 /************************/

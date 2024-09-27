@@ -29,7 +29,6 @@ import type {
     Db,
     BSON,
     Filter,
-    WithId,
     Collection,
     FindOptions,
     DeleteResult,
@@ -61,6 +60,7 @@ import type {
     ListSearchIndexesOptions,
     OptionalUnlessRequiredId,
 } from "mongodb";
+import { ZodObjectId } from "./schemas/objectid.js";
 
 /** Extracts the type of a model instance. */
 export type TypeOf<T extends Model<any, any>> = T["_type"];
@@ -70,6 +70,12 @@ export type GetPaths<T extends Model<any, any>> = T["_paths"];
 
 /** Update type for a model instance. */
 export type UpdateType<T> = DeepPartial<OmitId<T>>;
+
+/** Insert type for a model instance */
+export type InsertType<T extends ZodRawShape> = OptionalUnlessRequiredId<OptionalDefaults<T>>;
+
+/** Replace type for a model instance */
+export type ReplaceType<T extends ZodRawShape> = OmitId<OptionalDefaults<T>>;
 
 /**
  * Represents a model that maps to a MongoDB collection and defines the structure of documents within that collection
@@ -160,7 +166,9 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
             ? createSchemaFromData(this.schema, data)
             : partialFields && partialFields.length > 0
             ? createSchemaFromPaths(this.schema, partialFields)
-            : this.schema;
+            : this.schema.shape._id
+            ? this.schema
+            : this.schema.extend({ _id: ZodObjectId });
 
         let test;
         if (isStrict) test = await schema.strict().safeParseAsync(data);
@@ -537,14 +545,14 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * @param {FindOptions} options - Optional settings for the `find` operation. Learn more at
      *                                {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html this}.
      *
-     * @returns {Promise<WithId<Type>[]>} A promise that resolves to an array of documents matching the criteria.
+     * @returns {Promise<Type[]>} A promise that resolves to an array of documents matching the criteria.
      *
      * @example
      * // Find all user documents in the collection.
      * const users = await UserModel.find();
      */
-    public async find(filter?: Filter<Type>, options?: FindOptions): Promise<WithId<Type>[]> {
-        return this._find("find", filter, options) as Promise<WithId<Type>[]>;
+    public async find(filter?: Filter<Type>, options?: FindOptions): Promise<Type[]> {
+        return this._find("find", filter, options) as Promise<Type[]>;
     }
 
     /**
@@ -554,14 +562,14 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * @param {FindOptions} options - Optional settings for the `findById` operation. Learn more at
      *                                {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html this}.
      *
-     * @returns {Promise<WithId<Type> | null>} A promise that resolves to the document matching the ID.
+     * @returns {Promise<Type | null>} A promise that resolves to the document matching the ID.
      *                                 If no document is found, the promise resolves to null.
      *
      * @example
      * // Find a user document with the specified ID.
      * const user = await UserModel.findById(new ObjectId("64b175497dc71570edd625d2"));
      */
-    public async findById(id: IdField<Type>, options?: FindOptions): Promise<WithId<Type> | null> {
+    public async findById(id: IdField<Type>, options?: FindOptions): Promise<Type | null> {
         return this.findOne({ _id: id }, options);
     }
 
@@ -576,7 +584,7 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * @param {FindOneAndUpdateOptions} options - Optional settings for the `findByIdAndUpdate` operation. Learn more at
      *                                            {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html this}.
      *
-     * @returns {Promise<ModifyResult<Type> | WithId<Type> | null>} A promise that resolves to the original document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the original document or `null` if no document is found.
      *
      * @example
      * // Update a user document with the specified ID and return the original document (before updated).
@@ -591,18 +599,18 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
         id: IdField<Type>,
         update: UpdateType<Type>,
         options: FindOneAndUpdateOptions & { includeResultMetadata: false }
-    ): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
     public async findByIdAndUpdate(
         id: IdField<Type>,
         update: UpdateType<Type>,
         options: FindOneAndUpdateOptions
-    ): Promise<WithId<Type> | null>;
-    public async findByIdAndUpdate(id: IdField<Type>, update: UpdateType<Type>): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
+    public async findByIdAndUpdate(id: IdField<Type>, update: UpdateType<Type>): Promise<Type | null>;
     public async findByIdAndUpdate(
         id: IdField<Type>,
         update: UpdateType<Type>,
         options?: FindOneAndUpdateOptions
-    ): Promise<ModifyResult<Type> | WithId<Type> | null> {
+    ): Promise<ModifyResult<Type> | Type | null> {
         if (!options) return this.findOneAndUpdate({ _id: id }, update);
         else return this.findOneAndUpdate({ _id: id }, update, options);
     }
@@ -611,11 +619,11 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * Finds a document in the collection by its ID and replaces it.
      *
      * @param {IdField<Type>} id - The ID of the document to find and replace.
-     * @param {OmitId<OptionalDefaults<Type>>} replacement - The replacement document.
+     * @param {ReplaceType<SchemaType>} replacement - The replacement document.
      * @param {FindOneAndReplaceOptions} options - Optional settings for the `findByIdAndReplace` operation. Learn more at
      *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html this}.
      *
-     * @returns {Promise<ModifyResult<Type> | WithId<Type> | null>} A promise that resolves to the original document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the original document or `null` if no document is found.
      *
      * @example
      * // Replace a user document with a new one and return the original document (before replaced).
@@ -623,28 +631,25 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      */
     public async findByIdAndReplace(
         id: IdField<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<Type>>;
     public async findByIdAndReplace(
         id: IdField<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions & { includeResultMetadata: false }
-    ): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
     public async findByIdAndReplace(
         id: IdField<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions
-    ): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
+    public async findByIdAndReplace(id: IdField<Type>, replacement: ReplaceType<SchemaType>): Promise<Type | null>;
     public async findByIdAndReplace(
         id: IdField<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>
-    ): Promise<WithId<Type> | null>;
-    public async findByIdAndReplace(
-        id: IdField<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options?: FindOneAndReplaceOptions
-    ): Promise<ModifyResult<Type> | WithId<Type> | null> {
+    ): Promise<ModifyResult<Type> | Type | null> {
         if (!options) return this.findOneAndReplace({ _id: id }, replacement);
         else return this.findOneAndReplace({ _id: id }, replacement, options);
     }
@@ -656,7 +661,7 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * @param {FindOneAndDeleteOptions} options - Optional settings for the `findByIdAndDelete` operation. Learn more at
      *                                            {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html this}.
      *
-     * @returns {Promise<ModifyResult<Type> | WithId<Type> | null>} A promise that resolves to the deleted document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the deleted document or `null` if no document is found.
      *
      * @example
      * // Delete a user document with the specified ID and return the deleted document.
@@ -669,13 +674,13 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
     public async findByIdAndDelete(
         id: IdField<Type>,
         options: FindOneAndDeleteOptions & { includeResultMetadata: false }
-    ): Promise<WithId<Type> | null>;
-    public async findByIdAndDelete(id: IdField<Type>, options: FindOneAndDeleteOptions): Promise<WithId<Type> | null>;
-    public async findByIdAndDelete(id: IdField<Type>): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
+    public async findByIdAndDelete(id: IdField<Type>, options: FindOneAndDeleteOptions): Promise<Type | null>;
+    public async findByIdAndDelete(id: IdField<Type>): Promise<Type | null>;
     public async findByIdAndDelete(
         id: IdField<Type>,
         options?: FindOneAndDeleteOptions
-    ): Promise<ModifyResult<Type> | WithId<Type> | null> {
+    ): Promise<ModifyResult<Type> | Type | null> {
         if (!options) return this.findOneAndDelete({ _id: id });
         else return this.findOneAndDelete({ _id: id }, options);
     }
@@ -687,14 +692,14 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * @param {FindOptions} options - Optional settings for the `findOne` operation. Learn more at
      *                                {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html this}.
      *
-     * @returns {Promise<WithId<Type> | null>} A promise that resolves to the first document matching the criteria.
+     * @returns {Promise<Type | null>} A promise that resolves to the first document matching the criteria.
      *
      * @example
      * // Find a user document with the specified name.
      * const user = await UserModel.findOne({ name: "John Doe" });
      */
-    public async findOne(filter?: Filter<Type>, options?: FindOptions): Promise<WithId<Type> | null> {
-        return this._find("findOne", filter, options) as Promise<WithId<Type> | null>;
+    public async findOne(filter?: Filter<Type>, options?: FindOptions): Promise<Type | null> {
+        return this._find("findOne", filter, options) as Promise<Type | null>;
     }
 
     /**
@@ -708,7 +713,7 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * @param {FindOneAndUpdateOptions} options - Options for the `findOneAndUpdate` operation. Learn more at
      *                                            {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html this}.
      *
-     * @returns {Promise<ModifyResult<Type> | WithId<Type> | null>} A promise that resolves to the original document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the original document or `null` if no document is found.
      *
      * @example
      * // Update a user's age and return the original document (before updated).
@@ -723,18 +728,18 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
         filter: Filter<Type>,
         update: UpdateType<Type>,
         options: FindOneAndUpdateOptions & { includeResultMetadata: false }
-    ): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
     public async findOneAndUpdate(
         filter: Filter<Type>,
         update: UpdateType<Type>,
         options: FindOneAndUpdateOptions
-    ): Promise<WithId<Type> | null>;
-    public async findOneAndUpdate(filter: Filter<Type>, update: UpdateType<Type>): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
+    public async findOneAndUpdate(filter: Filter<Type>, update: UpdateType<Type>): Promise<Type | null>;
     public async findOneAndUpdate(
         filter: Filter<Type>,
         update: UpdateType<Type>,
         options?: FindOneAndUpdateOptions
-    ): Promise<ModifyResult<Type> | WithId<Type> | null> {
+    ): Promise<ModifyResult<Type> | Type | null> {
         if (update.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
         await this.parse(update, { isPartial: true });
 
@@ -753,18 +758,18 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
             res = this.collection.findOneAndUpdate(filter, updateFilter, options);
         } else res = this.collection.findOneAndUpdate(filter, updateFilter);
 
-        return res.then(async (doc) => doc);
+        return res.then((doc) => doc as Type | null);
     }
 
     /**
      * Finds a document in the collection that match the specified filter criteria and replaces it.
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
-     * @param {OmitId<OptionalDefaults<Type>>} replacement - The replacement document.
+     * @param {ReplaceType<SchemaType>} replacement - The replacement document.
      * @param {FindOneAndReplaceOptions} options - Optional settings for the `findOneAndReplace` operation. Learn more at
      *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html this}.
      *
-     * @returns {Promise<ModifyResult<Type> | WithId<Type> | null>} A promise that resolves to the original document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the original document or `null` if no document is found.
      *
      * @example
      * // Replace a user document with a new one and return the original document (before replaced).
@@ -772,28 +777,25 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      */
     public async findOneAndReplace(
         filter: Filter<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<Type>>;
     public async findOneAndReplace(
         filter: Filter<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions & { includeResultMetadata: false }
-    ): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
     public async findOneAndReplace(
         filter: Filter<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions
-    ): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
+    public async findOneAndReplace(filter: Filter<Type>, replacement: ReplaceType<SchemaType>): Promise<Type | null>;
     public async findOneAndReplace(
         filter: Filter<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>
-    ): Promise<WithId<Type> | null>;
-    public async findOneAndReplace(
-        filter: Filter<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options?: FindOneAndReplaceOptions
-    ): Promise<ModifyResult<Type> | WithId<Type> | null> {
+    ): Promise<ModifyResult<Type> | Type | null> {
         if (replacement.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
         const replaceData = removeUndefinedFields(
             await this.parse(
@@ -816,7 +818,7 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
             res = this.collection.findOneAndReplace(filter, replaceData, options);
         } else res = this.collection.findOneAndReplace(filter, replaceData);
 
-        return res.then((doc) => doc);
+        return res.then((doc) => doc as Type | null);
     }
 
     /**
@@ -826,7 +828,7 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * @param {FindOneAndDeleteOptions} options - Options for the `findOneAndDelete` operation. Learn more at
      *                                            {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html this}.
      *
-     * @returns {Promise<ModifyResult<Type> | WithId<Type> | null>} A promise that resolves to the deleted document or `null` if no document is found.
+     * @returns {Promise<ModifyResult<Type> | Type | null>} A promise that resolves to the deleted document or `null` if no document is found.
      *
      * @example
      * // Delete a user's document with the specified name and return the deleted document.
@@ -839,13 +841,13 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
     public async findOneAndDelete(
         filter: Filter<Type>,
         options: FindOneAndDeleteOptions & { includeResultMetadata: false }
-    ): Promise<WithId<Type> | null>;
-    public async findOneAndDelete(filter: Filter<Type>, options: FindOneAndDeleteOptions): Promise<WithId<Type> | null>;
-    public async findOneAndDelete(filter: Filter<Type>): Promise<WithId<Type> | null>;
+    ): Promise<Type | null>;
+    public async findOneAndDelete(filter: Filter<Type>, options: FindOneAndDeleteOptions): Promise<Type | null>;
+    public async findOneAndDelete(filter: Filter<Type>): Promise<Type | null>;
     public async findOneAndDelete(
         filter: Filter<Type>,
         options?: FindOneAndDeleteOptions
-    ): Promise<ModifyResult<Type> | WithId<Type> | null> {
+    ): Promise<ModifyResult<Type> | Type | null> {
         let res;
         if (options) {
             if (options.includeResultMetadata)
@@ -857,21 +859,23 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
             res = this.collection.findOneAndDelete(filter, options);
         } else res = this.collection.findOneAndDelete(filter);
 
-        return res.then((doc) => doc);
+        return res.then((doc) => doc as Type | null);
     }
 
     private async _find(
         method: "find" | "findOne",
         filter: Filter<Type> = {},
         options?: FindOptions
-    ): Promise<WithId<Type>[] | WithId<Type> | null> {
+    ): Promise<Type[] | Type | null> {
         const isCheckOnGet = this.checkOnGet;
 
         if (method === "find") {
             const docs = await this.collection.find(filter, options).toArray();
-            return isCheckOnGet ? await Promise.all(docs.map((doc) => this.parse(doc, { isStrict: false }))) : docs;
+            return (
+                isCheckOnGet ? await Promise.all(docs.map((doc) => this.parse(doc, { isStrict: false }))) : docs
+            ) as Type[];
         } else {
-            const doc = await this.collection.findOne<WithId<Type>>(filter, options);
+            const doc = await this.collection.findOne<Type>(filter, options);
             return isCheckOnGet && doc ? await this.parse(doc, { isStrict: false }) : doc;
         }
     }
@@ -879,7 +883,7 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
     /**
      * Inserts a single document into the collection.
      *
-     * @param {OptionalDefaults<SchemaType>} data - The document to insert into the collection.
+     * @param {ReplaceType<SchemaType>} data - The document to insert into the collection.
      * @param {InsertOneOptions} options - Optional settings for the insert operation. Learn more at
      *                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/InsertOneOptions.html this}.
      *
@@ -889,14 +893,14 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * // Insert a new user document into the collection.
      * const result = await UserModel.insertOne({ name: "John Doe", age: 30 });
      */
-    public async insertOne(data: OptionalDefaults<SchemaType>, options?: InsertOneOptions): Promise<InsertOneResult> {
+    public async insertOne(data: InsertType<SchemaType>, options?: InsertOneOptions): Promise<InsertOneResult> {
         return this._insert(data, options) as Promise<InsertOneResult>;
     }
 
     /**
      * Inserts multiple documents into the collection.
      *
-     * @param {OptionalDefaults<SchemaType>[]} data - An array of documents to insert into the collection.
+     * @param {ReplaceType<SchemaType>[]} data - An array of documents to insert into the collection.
      * @param {BulkWriteOptions} options - Optional settings for the bulk write operation. Learn more at
      *                                     {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/BulkWriteOptions.html this}.
      *
@@ -909,15 +913,12 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      *   { name: "Jane Doe", age: 25 }
      * ]);
      */
-    public async insertMany(
-        data: OptionalDefaults<SchemaType>[],
-        options?: BulkWriteOptions
-    ): Promise<InsertManyResult> {
+    public async insertMany(data: InsertType<SchemaType>, options?: BulkWriteOptions): Promise<InsertManyResult> {
         return this._insert(data, options) as Promise<InsertManyResult>;
     }
 
     private async _insert(
-        data: OptionalDefaults<SchemaType> | OptionalDefaults<SchemaType>[],
+        data: InsertType<SchemaType> | InsertType<SchemaType>[],
         options?: InsertOneOptions | BulkWriteOptions
     ): Promise<InsertOneResult | InsertManyResult> {
         if (Array.isArray(data)) {
@@ -930,8 +931,8 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
                 options as BulkWriteOptions
             );
         } else {
-            data = removeUndefinedFields(await this.parse(data)) as OptionalDefaults<SchemaType>;
-            return this.collection.insertOne(data as OptionalUnlessRequiredId<Type>, options as InsertOneOptions);
+            const insertData = removeUndefinedFields(await this.parse(data)) as Type;
+            return this.collection.insertOne(insertData as OptionalUnlessRequiredId<Type>, options as InsertOneOptions);
         }
     }
 
@@ -1008,7 +1009,7 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * The entire document is replaced with the provided replacement document.
      *
      * @param {Filter<Type>} filter - The filter criteria to locate the document to replace.
-     * @param {OmitId<OptionalDefaults<SchemaType>>} replacement - The replacement document that will replace the existing document.
+     * @param {ReplaceType<SchemaType>} replacement - The replacement document that will replace the existing document.
      * @param {ReplaceOptions} options - Optional settings for the replace operation. Learn more at
      *                                   {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/ReplaceOptions.html this}.
      *
@@ -1020,7 +1021,7 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      */
     public async replaceOne(
         filter: Filter<Type>,
-        replacement: OmitId<OptionalDefaults<SchemaType>>,
+        replacement: ReplaceType<SchemaType>,
         options?: ReplaceOptions
     ): Promise<UpdateResult> {
         if (replacement.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();

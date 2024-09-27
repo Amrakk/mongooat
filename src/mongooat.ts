@@ -1,13 +1,13 @@
+import { z } from "zod";
 import { Model } from "./model.js";
 import { MongoClient } from "mongodb";
 
 import DBNotSetError from "./error/dbNotSet.js";
 
-import type { ValidSchemaType } from "./types.js";
+import type { ZodObject, ZodRawShape } from "zod";
 import type { TypeOf, GetPaths } from "./model.js";
-import type { ZodObject, ZodRawShape, z } from "zod";
 import type { ModelOptions } from "./options/modelOptions.js";
-import type { BSON, Collection, CreateCollectionOptions, Db, DbOptions, MongoClientOptions } from "mongodb";
+import type { BSON, Collection, CreateCollectionOptions, Db, DbOptions, MongoClientOptions, WithId } from "mongodb";
 
 // type infer, paths inspired by Zod
 namespace Mongooat {
@@ -131,9 +131,9 @@ class Mongooat {
      *
      * @returns {Model<MT, ST>} - A new Model instance.
      */
-    public Model<MT extends z.infer<ZodObject<ST>>, ST extends ZodRawShape>(
+    public Model<MT extends WithId<z.infer<ZodObject<ST>>>, ST extends ZodRawShape>(
         name: string,
-        schema: z.ZodObject<ST> & ValidSchemaType<ST>,
+        schema: z.ZodObject<ST>,
         options?: ModelOptions<MT>
     ): Model<MT, ST> {
         if (!this._currDb) throw new DBNotSetError();
