@@ -235,7 +235,13 @@ export type OptionalDefaults<T extends z.ZodRawShape> = {
  * **Note:** This will return `ZodObject<never>` if the `_id` field is invalid.
  */
 export type ValidSchemaType<T extends z.ZodRawShape> = z.ZodObject<
-    T extends { _id: z.ZodType<any> } ? (UnwrapZodType<T["_id"]> extends ValidIdZodType ? T : never) : T
+    T extends { _id: z.ZodType<any> }
+        ? T["_id"] extends z.ZodOptional<any>
+            ? never
+            : UnwrapZodType<T["_id"]> extends ValidIdZodType
+            ? T
+            : never
+        : T
 >;
 
 /**

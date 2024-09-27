@@ -4,6 +4,7 @@ import { MongoClient } from "mongodb";
 
 import DBNotSetError from "./error/dbNotSet.js";
 
+import type { ValidSchemaType } from "./types.js";
 import type { ZodObject, ZodRawShape } from "zod";
 import type { TypeOf, GetPaths } from "./model.js";
 import type { ModelOptions } from "./options/modelOptions.js";
@@ -122,7 +123,7 @@ class Mongooat {
      * Creates and returns a new Model instance with the specified name, schema, and options.
      *
      * **Note:**
-     * - `_id` field must not be an `array`, `tuple`, `undefined` or `unknown`.
+     * - `_id` field must not be an `ZodArray`, `ZodTuple`, `ZodUndefined`, `ZodOptional` or `ZodUnknown`.
      * - If the `_id` field is invalid, the schema type resolves to `never`.
      *
      * @param {string} name - The name of the model to create.
@@ -133,7 +134,7 @@ class Mongooat {
      */
     public Model<MT extends WithId<z.infer<ZodObject<ST>>>, ST extends ZodRawShape>(
         name: string,
-        schema: z.ZodObject<ST>,
+        schema: z.ZodObject<ST> & ValidSchemaType<ST>,
         options?: ModelOptions<MT>
     ): Model<MT, ST> {
         if (!this._currDb) throw new DBNotSetError();

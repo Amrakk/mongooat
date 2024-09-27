@@ -29,6 +29,7 @@ import type {
     Db,
     BSON,
     Filter,
+    WithId,
     Collection,
     FindOptions,
     DeleteResult,
@@ -39,10 +40,8 @@ import type {
     UpdateOptions,
     ReplaceOptions,
     DistinctOptions,
-    InsertOneResult,
     AggregateOptions,
     BulkWriteOptions,
-    InsertManyResult,
     IndexDescription,
     InsertOneOptions,
     AggregationCursor,
@@ -85,7 +84,7 @@ export type ReplaceType<T extends ZodRawShape> = OmitId<OptionalDefaults<T>>;
  * @template Type - The TypeScript type that represents the shape of documents in the MongoDB collection.
  * @template SchemaType - The shape of the schema used for validation, defined using Zod.
  */
-export class Model<Type extends Record<string | number, unknown>, SchemaType extends ZodRawShape> {
+export class Model<Type extends WithId<Record<string | number, unknown>>, SchemaType extends ZodRawShape> {
     private _name: string;
     private _schema: ZodObject<SchemaType>;
     private _collection: Collection<Type>;
@@ -893,8 +892,8 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      * // Insert a new user document into the collection.
      * const result = await UserModel.insertOne({ name: "John Doe", age: 30 });
      */
-    public async insertOne(data: InsertType<SchemaType>, options?: InsertOneOptions): Promise<InsertOneResult> {
-        return this._insert(data, options) as Promise<InsertOneResult>;
+    public async insertOne(data: InsertType<SchemaType>, options?: InsertOneOptions): Promise<Type> {
+        return (await this._insert(data, options)) as Type;
     }
 
     /**
@@ -913,26 +912,38 @@ export class Model<Type extends Record<string | number, unknown>, SchemaType ext
      *   { name: "Jane Doe", age: 25 }
      * ]);
      */
-    public async insertMany(data: InsertType<SchemaType>, options?: BulkWriteOptions): Promise<InsertManyResult> {
-        return this._insert(data, options) as Promise<InsertManyResult>;
+    public async insertMany(data: InsertType<SchemaType>[], options?: BulkWriteOptions): Promise<Type[]> {
+        return (await this._insert(data, options)) as Type[];
     }
 
     private async _insert(
         data: InsertType<SchemaType> | InsertType<SchemaType>[],
         options?: InsertOneOptions | BulkWriteOptions
-    ): Promise<InsertOneResult | InsertManyResult> {
+    ): Promise<Type | Type[]> {
         if (Array.isArray(data)) {
             const insertData = await Promise.all(
                 data.map(async (doc) => removeUndefinedFields((await this.parse(doc)) as Type))
             );
 
-            return this.collection.insertMany(
+            const result = await this.collection.insertMany(
                 insertData as OptionalUnlessRequiredId<Type>[],
                 options as BulkWriteOptions
             );
+
+            insertData.forEach((data, index) => {
+                data._id = result.insertedIds[index];
+            });
+
+            return insertData;
         } else {
             const insertData = removeUndefinedFields(await this.parse(data)) as Type;
-            return this.collection.insertOne(insertData as OptionalUnlessRequiredId<Type>, options as InsertOneOptions);
+            const result = await this.collection.insertOne(
+                insertData as OptionalUnlessRequiredId<Type>,
+                options as InsertOneOptions
+            );
+
+            insertData._id = result.insertedId;
+            return insertData;
         }
     }
 

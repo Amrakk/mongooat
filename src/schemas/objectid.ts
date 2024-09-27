@@ -6,4 +6,4 @@ export const ZodObjectId = z
     .custom<ObjectId>((value) => ObjectId.isValid(value), {
         message: "Invalid ObjectID",
     })
-    .default(new ObjectId());
+    .default(() => new ObjectId());

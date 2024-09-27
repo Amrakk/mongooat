@@ -38,4 +38,4 @@ export const WILDCARD_INDEX_MAP = Object.freeze({
 export const INVALID_ZOD_TYPES = [z.ZodVoid, z.ZodPromise, z.ZodFunction];
 
 /** Invalid `_id` Zod types */
-export const INVALID_ID_ZOD_TYPES = [z.ZodArray, z.ZodTuple, z.ZodUndefined, z.ZodUnknown];
+export const INVALID_ID_ZOD_TYPES = [z.ZodArray, z.ZodTuple, z.ZodUndefined, z.ZodUnknown, z.ZodOptional];
