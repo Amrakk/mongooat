@@ -17,6 +17,11 @@ import { DEFAULT_ARRAY_PLACEHOLDER, INVALID_ID_ZOD_TYPES, INVALID_ZOD_TYPES } fr
 export function validateSchema<T extends z.ZodRawShape>(zod: z.ZodObject<T>, modelName: string): void {
     const err: InvalidSchemaMap = [];
 
+    if (zod.shape._id instanceof z.ZodOptional) {
+        const typeName = typeof zod.shape._id === "object" ? zod.shape._id.constructor.name : typeof zod.shape._id;
+        err.push({ path: "_id", reason: `The '_id' field must not be an '${typeName}' type.` });
+    }
+
     const idField = getBaseSchema(zod.shape._id);
     if (idField && (isInvalidIdField(idField) || isInvalidField(idField))) {
         const typeName = typeof idField === "object" ? idField.constructor.name : typeof idField;
