@@ -1,5 +1,5 @@
 import { assert } from "chai";
-import MongooatError from "../../src/error/mongooatError.js";
+import MongooatError from "../../src/errors/mongooatError.js";
 
 export function assertErrorInstance<T extends MongooatError>(fn: () => unknown, expectedError: T) {
     try {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { InvalidSchemaMap } from "../types.js";
-import InvalidSchemaError from "../error/model/invalidSchema.js";
+import InvalidSchemaError from "../errors/model/invalidSchema.js";
 import { DEFAULT_ARRAY_PLACEHOLDER, INVALID_ID_ZOD_TYPES, INVALID_ZOD_TYPES } from "../constants.js";
 
 /**
