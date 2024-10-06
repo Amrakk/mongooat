@@ -1,10 +1,7 @@
-import { z } from "zod";
 import Mongooat from "./mongooat.js";
-import MGErrors from "./errors/index.js";
-import { ObjectId, BSON } from "mongodb";
-import * as MGSchemas from "./schemas/index.js";
+export { Mongooat };
 
-export { Mongooat, MGErrors, MGSchemas, ObjectId, BSON, z };
-const mongooat = { Mongooat, MGErrors, MGSchemas, ObjectId, BSON, z };
-
-export default mongooat;
+export { z } from "zod";
+export * from "./errors/index.js";
+export * from "./schemas/index.js";
+export { ObjectId, BSON } from "mongodb";
