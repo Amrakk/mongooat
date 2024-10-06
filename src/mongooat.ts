@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Model } from "./model.js";
 import { MongoClient } from "mongodb";
 
-import DBNotSetError from "./error/dbNotSet.js";
+import DBNotSetError from "./errors/dbNotSet.js";
 
 import type { ValidSchemaType } from "./types.js";
 import type { ZodObject, ZodRawShape } from "zod";

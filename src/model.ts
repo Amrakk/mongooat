@@ -5,9 +5,9 @@ import { DefaultModelOptions, ModelOptions } from "./options/modelOptions.js";
 import { createSchemaFromData, createSchemaFromPaths } from "./helpers/generateSchema.js";
 import { processUndefinedFieldsForUpdate, removeUndefinedFields } from "./helpers/processUndefinedFields.js";
 
-import ValidateError from "./error/validate.js";
-import MissingModelNameError from "./error/model/missingModelName.js";
-import IdFieldNotAllowedError from "./error/model/idFieldNotAllowed.js";
+import ValidateError from "./errors/validateError.js";
+import MissingModelNameError from "./errors/model/missingModelName.js";
+import IdFieldNotAllowedError from "./errors/model/idFieldNotAllowed.js";
 
 import type { ParseOptions } from "./options/parseOptions.js";
 import type { ZodObject, ZodRawShape } from "zod";

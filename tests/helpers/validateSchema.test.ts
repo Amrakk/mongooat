@@ -2,9 +2,9 @@ import { z } from "zod";
 import { assert } from "chai";
 import { ZodObjectId } from "../../src/schemas/objectid.js";
 import { DEFAULT_ARRAY_PLACEHOLDER } from "../../src/constants.js";
-import { assertErrorInstance } from "../utils/assertErrorInstance.js";
 import { validateSchema } from "../../src/helpers/validateSchema.js";
-import InvalidSchemaError from "../../src/error/model/invalidSchema.js";
+import { assertErrorInstance } from "../utils/assertErrorInstance.js";
+import InvalidSchemaError from "../../src/errors/model/invalidSchema.js";
 
 describe("helpers.validateSchema", () => {
     /**

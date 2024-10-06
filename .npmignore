@@ -4,5 +4,7 @@ notes.txt
 .npmignore
 .gitignore
 
+tsconfig.json
+
 /src
 /tests
