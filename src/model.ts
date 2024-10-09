@@ -25,39 +25,40 @@ import type {
     MGIndexSpecification,
     MGCreateIndexesOptions,
 } from "./types.js";
-import type {
-    Db,
-    BSON,
-    Filter,
-    WithId,
-    Collection,
-    FindOptions,
-    DeleteResult,
-    ModifyResult,
-    UpdateFilter,
-    UpdateResult,
-    DeleteOptions,
-    UpdateOptions,
-    ReplaceOptions,
-    DistinctOptions,
-    AggregateOptions,
-    BulkWriteOptions,
-    IndexDescription,
-    InsertOneOptions,
-    AggregationCursor,
-    ListIndexesCursor,
-    DropIndexesOptions,
-    IndexSpecification,
-    ListIndexesOptions,
-    AnyBulkWriteOperation,
-    CountDocumentsOptions,
-    SearchIndexDescription,
-    FindOneAndUpdateOptions,
-    FindOneAndDeleteOptions,
-    ListSearchIndexesCursor,
-    FindOneAndReplaceOptions,
-    ListSearchIndexesOptions,
-    OptionalUnlessRequiredId,
+import {
+    type Db,
+    type BSON,
+    type Filter,
+    type WithId,
+    type Collection,
+    type FindOptions,
+    type DeleteResult,
+    type ModifyResult,
+    type UpdateFilter,
+    type UpdateResult,
+    type DeleteOptions,
+    type UpdateOptions,
+    type ReplaceOptions,
+    type DistinctOptions,
+    type AggregateOptions,
+    type BulkWriteOptions,
+    type IndexDescription,
+    type InsertOneOptions,
+    type AggregationCursor,
+    type ListIndexesCursor,
+    type DropIndexesOptions,
+    type IndexSpecification,
+    type ListIndexesOptions,
+    type AnyBulkWriteOperation,
+    type CountDocumentsOptions,
+    type SearchIndexDescription,
+    type FindOneAndUpdateOptions,
+    type FindOneAndDeleteOptions,
+    type ListSearchIndexesCursor,
+    type FindOneAndReplaceOptions,
+    type ListSearchIndexesOptions,
+    type OptionalUnlessRequiredId,
+    ObjectId,
 } from "mongodb";
 import { ZodObjectId } from "./schemas/objectid.js";
 
@@ -167,7 +168,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
             ? createSchemaFromPaths(this.schema, partialFields)
             : this.schema.shape._id
             ? this.schema
-            : this.schema.extend({ _id: ZodObjectId });
+            : this.schema.extend({ _id: ZodObjectId.default(() => new ObjectId()) });
 
         let test;
         if (isStrict) test = await schema.strict().safeParseAsync(data);
