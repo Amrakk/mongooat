@@ -69,9 +69,6 @@ export type TypeOf<T extends Model<any, any>> = T["_type"];
 /** Extracts the type dot-notation paths of a model instance. */
 export type GetPaths<T extends Model<any, any>> = T["_paths"];
 
-/** Filter type for a model instance. */
-export type FilterType<T> = Filter<AssignStringToObjectId<T>>;
-
 /** Update type for a model instance. */
 export type UpdateType<T> = DeepPartial<AssignStringToObjectId<OmitId<T>>>;
 
@@ -239,13 +236,13 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     /**
      * Counts the number of documents in the collection that match the specified filter criteria.
      *
-     * @param {FilterType<Type>} filter - Optional filter criteria to apply to the count operation.
+     * @param {Filter<Type>} filter - Optional filter criteria to apply to the count operation.
      * @param {CountDocumentsOptions} options - Optional settings for the countDocuments operation. Learn more at
      *                                          {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/CountDocumentsOptions.html this}.
      *
      * @returns {Promise<number>} A promise that resolves to the number of documents matching the criteria.
      */
-    public countDocuments(filter?: FilterType<Type>, options?: CountDocumentsOptions): Promise<number> {
+    public countDocuments(filter?: Filter<Type>, options?: CountDocumentsOptions): Promise<number> {
         return this.collection.countDocuments(filter as Filter<Type>, options);
     }
 
@@ -267,7 +264,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * Get the distinct values of the specified field in the collection.
      *
      * @param {Key} key - The field for which to return distinct values.
-     * @param {FilterType<Type>} filter - Optional filter criteria to apply to the distinct operation.
+     * @param {Filter<Type>} filter - Optional filter criteria to apply to the distinct operation.
      * @param {DistinctOptions} options - Optional settings for the distinct operation. Learn more at
      *                                    {@link https://mongodb.github.io/node-mongodb-native/6.7/types/DistinctOptions.html this}.
      *
@@ -276,16 +273,16 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     public distinct<Key extends ObjectKeyPaths<Type>>(key: Key): Promise<Flatten<ResolvePath<Type, Key>>[]>;
     public distinct<Key extends ObjectKeyPaths<Type>>(
         key: Key,
-        filter: FilterType<Type>
+        filter: Filter<Type>
     ): Promise<Flatten<ResolvePath<Type, Key>>[]>;
     public distinct<Key extends ObjectKeyPaths<Type>>(
         key: Key,
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         options: DistinctOptions
     ): Promise<Flatten<ResolvePath<Type, Key>>[]>;
     public distinct<Key extends ObjectKeyPaths<Type>>(
         key: Key,
-        filter?: FilterType<Type>,
+        filter?: Filter<Type>,
         options?: DistinctOptions
     ): Promise<Flatten<ResolvePath<Type, Key>>[]> {
         const fixedKey = (key as string).replaceAll(`.${DEFAULT_ARRAY_PLACEHOLDER}`, "");
@@ -545,7 +542,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     /**
      * Finds documents in the collection that match the specified filter criteria.
      *
-     * @param {FilterType<Type>} filter - Optional filter criteria to apply to the find operation.
+     * @param {Filter<Type>} filter - Optional filter criteria to apply to the find operation.
      * @param {FindOptions} options - Optional settings for the `find` operation. Learn more at
      *                                {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html this}.
      *
@@ -555,7 +552,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * // Find all user documents in the collection.
      * const users = await UserModel.find();
      */
-    public async find(filter?: FilterType<Type>, options?: FindOptions): Promise<Type[]> {
+    public async find(filter?: Filter<Type>, options?: FindOptions): Promise<Type[]> {
         return this._find("find", filter, options) as Promise<Type[]>;
     }
 
@@ -574,7 +571,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * const user = await UserModel.findById(new ObjectId("64b175497dc71570edd625d2"));
      */
     public async findById(id: IdField<Type>, options?: FindOptions): Promise<Type | null> {
-        return this.findOne({ _id: id } as FilterType<Type>, options);
+        return this.findOne({ _id: id } as Filter<Type>, options);
     }
 
     /**
@@ -615,8 +612,8 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         update: UpdateType<Type>,
         options?: FindOneAndUpdateOptions
     ): Promise<ModifyResult<Type> | Type | null> {
-        if (!options) return this.findOneAndUpdate({ _id: id } as FilterType<Type>, update);
-        else return this.findOneAndUpdate({ _id: id } as FilterType<Type>, update, options);
+        if (!options) return this.findOneAndUpdate({ _id: id } as Filter<Type>, update);
+        else return this.findOneAndUpdate({ _id: id } as Filter<Type>, update, options);
     }
 
     /**
@@ -654,8 +651,8 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         replacement: ReplaceType<SchemaType>,
         options?: FindOneAndReplaceOptions
     ): Promise<ModifyResult<Type> | Type | null> {
-        if (!options) return this.findOneAndReplace({ _id: id } as FilterType<Type>, replacement);
-        else return this.findOneAndReplace({ _id: id } as FilterType<Type>, replacement, options);
+        if (!options) return this.findOneAndReplace({ _id: id } as Filter<Type>, replacement);
+        else return this.findOneAndReplace({ _id: id } as Filter<Type>, replacement, options);
     }
 
     /**
@@ -685,14 +682,14 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         id: IdField<Type>,
         options?: FindOneAndDeleteOptions
     ): Promise<ModifyResult<Type> | Type | null> {
-        if (!options) return this.findOneAndDelete({ _id: id } as FilterType<Type>);
-        else return this.findOneAndDelete({ _id: id } as FilterType<Type>, options);
+        if (!options) return this.findOneAndDelete({ _id: id } as Filter<Type>);
+        else return this.findOneAndDelete({ _id: id } as Filter<Type>, options);
     }
 
     /**
      * Finds a document in the collection that match the specified filter criteria.
      *
-     * @param {FilterType<Type>} [filter] - Optional filter criteria to apply to the find operation.
+     * @param {Filter<Type>} [filter] - Optional filter criteria to apply to the find operation.
      * @param {FindOptions} options - Optional settings for the `findOne` operation. Learn more at
      *                                {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOptions.html this}.
      *
@@ -702,7 +699,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * // Find a user document with the specified name.
      * const user = await UserModel.findOne({ name: "John Doe" });
      */
-    public async findOne(filter?: FilterType<Type>, options?: FindOptions): Promise<Type | null> {
+    public async findOne(filter?: Filter<Type>, options?: FindOptions): Promise<Type | null> {
         return this._find("findOne", filter, options) as Promise<Type | null>;
     }
 
@@ -712,7 +709,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * **Note:** By default, this operation uses the `$set` operator. If you assign `undefined` to a field,
      * it will be removed from the document (using the `unset` operator) rather than being set to `null` (as MongoDB's default behavior).
      *
-     * @param {FilterType<Type>} filter - The filter criteria to locate the document to update.
+     * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the document.
      * @param {FindOneAndUpdateOptions} options - Options for the `findOneAndUpdate` operation. Learn more at
      *                                            {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndUpdateOptions.html this}.
@@ -724,23 +721,23 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * const user = await UserModel.findOneAndUpdate({ name: "John Doe" }, { age: 30 });
      */
     public async findOneAndUpdate(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         update: UpdateType<Type>,
         options: FindOneAndUpdateOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<Type>>;
     public async findOneAndUpdate(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         update: UpdateType<Type>,
         options: FindOneAndUpdateOptions & { includeResultMetadata: false }
     ): Promise<Type | null>;
     public async findOneAndUpdate(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         update: UpdateType<Type>,
         options: FindOneAndUpdateOptions
     ): Promise<Type | null>;
-    public async findOneAndUpdate(filter: FilterType<Type>, update: UpdateType<Type>): Promise<Type | null>;
+    public async findOneAndUpdate(filter: Filter<Type>, update: UpdateType<Type>): Promise<Type | null>;
     public async findOneAndUpdate(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         update: UpdateType<Type>,
         options?: FindOneAndUpdateOptions
     ): Promise<ModifyResult<Type> | Type | null> {
@@ -768,7 +765,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     /**
      * Finds a document in the collection that match the specified filter criteria and replaces it.
      *
-     * @param {FilterType<Type>} filter - The filter criteria to locate the document to update.
+     * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
      * @param {ReplaceType<SchemaType>} replacement - The replacement document.
      * @param {FindOneAndReplaceOptions} options - Optional settings for the `findOneAndReplace` operation. Learn more at
      *                                             {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndReplaceOptions.html this}.
@@ -780,26 +777,23 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * const replacedUser = await UserModel.findOneAndReplace({ name: "John Doe" }, { name: "Jane Doe" });
      */
     public async findOneAndReplace(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<Type>>;
     public async findOneAndReplace(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions & { includeResultMetadata: false }
     ): Promise<Type | null>;
     public async findOneAndReplace(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         replacement: ReplaceType<SchemaType>,
         options: FindOneAndReplaceOptions
     ): Promise<Type | null>;
+    public async findOneAndReplace(filter: Filter<Type>, replacement: ReplaceType<SchemaType>): Promise<Type | null>;
     public async findOneAndReplace(
-        filter: FilterType<Type>,
-        replacement: ReplaceType<SchemaType>
-    ): Promise<Type | null>;
-    public async findOneAndReplace(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         replacement: ReplaceType<SchemaType>,
         options?: FindOneAndReplaceOptions
     ): Promise<ModifyResult<Type> | Type | null> {
@@ -828,7 +822,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     /**
      * Finds a document in the collection that match the specified filter criteria and deletes it.
      *
-     * @param {FilterType<Type>} filter - The filter criteria to locate the document to delete.
+     * @param {Filter<Type>} filter - The filter criteria to locate the document to delete.
      * @param {FindOneAndDeleteOptions} options - Options for the `findOneAndDelete` operation. Learn more at
      *                                            {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/FindOneAndDeleteOptions.html this}.
      *
@@ -839,17 +833,17 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * const user = await UserModel.findOneAndDelete({ name: "John Doe" });
      */
     public async findOneAndDelete(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         options: FindOneAndDeleteOptions & { includeResultMetadata: true }
     ): Promise<ModifyResult<Type>>;
     public async findOneAndDelete(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         options: FindOneAndDeleteOptions & { includeResultMetadata: false }
     ): Promise<Type | null>;
-    public async findOneAndDelete(filter: FilterType<Type>, options: FindOneAndDeleteOptions): Promise<Type | null>;
-    public async findOneAndDelete(filter: FilterType<Type>): Promise<Type | null>;
+    public async findOneAndDelete(filter: Filter<Type>, options: FindOneAndDeleteOptions): Promise<Type | null>;
+    public async findOneAndDelete(filter: Filter<Type>): Promise<Type | null>;
     public async findOneAndDelete(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         options?: FindOneAndDeleteOptions
     ): Promise<ModifyResult<Type> | Type | null> {
         let res;
@@ -868,7 +862,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
 
     private async _find(
         method: "find" | "findOne",
-        filter: FilterType<Type> = {},
+        filter: Filter<Type> = {},
         options?: FindOptions
     ): Promise<Type[] | Type | null> {
         const isCheckOnGet = this.checkOnGet;
@@ -962,7 +956,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * **Note:** By default, this operation uses the `$set` operator. If you assign `undefined` to a field,
      * it will be removed from the document (using the `unset` operator) rather than being set to `null` (as MongoDB's default behavior).
      *
-     * @param {FilterType<Type>} filter - The filter criteria to locate the document to update.
+     * @param {Filter<Type>} filter - The filter criteria to locate the document to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the document.
      * @param {UpdateOptions} options - Optional settings for the update operation. Learn more at
      *                                  {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html this}.
@@ -974,7 +968,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * const result = await UserModel.updateOne({ name: "John Doe" }, { age: 31 });
      */
     public async updateOne(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         update: UpdateType<Type>,
         options?: UpdateOptions
     ): Promise<UpdateResult> {
@@ -987,7 +981,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * **Note:** By default, this operation uses the `$set` operator. If you assign `undefined` to a field,
      * it will be removed from the document (using the `unset` operator) rather than being set to `null` (as MongoDB's default behavior).
      *
-     * @param {FilterType<Type>} filter - The filter criteria to locate the documents to update.
+     * @param {Filter<Type>} filter - The filter criteria to locate the documents to update.
      * @param {UpdateType<Type>} update - The update operations to be applied to the documents.
      * @param {UpdateOptions} options - Optional settings for the update operation. Learn more at
      *                                  {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/UpdateOptions.html this}.
@@ -999,7 +993,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * const result = await UserModel.updateMany({ age: { $lt: 30 } }, { age: 30 });
      */
     public async updateMany(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         update: UpdateType<Type>,
         options?: UpdateOptions
     ): Promise<UpdateResult> {
@@ -1008,7 +1002,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
 
     private async _update(
         method: "updateOne" | "updateMany",
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         update: UpdateType<Type>,
         options?: UpdateOptions
     ): Promise<UpdateResult> {
@@ -1028,7 +1022,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * Replaces a single document in the collection that matches the given filter criteria.
      * The entire document is replaced with the provided replacement document.
      *
-     * @param {FilterType<Type>} filter - The filter criteria to locate the document to replace.
+     * @param {Filter<Type>} filter - The filter criteria to locate the document to replace.
      * @param {ReplaceType<SchemaType>} replacement - The replacement document that will replace the existing document.
      * @param {ReplaceOptions} options - Optional settings for the replace operation. Learn more at
      *                                   {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/ReplaceOptions.html this}.
@@ -1040,7 +1034,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * const result = await UserModel.replaceOne({ name: "John Doe" }, { name: "John Doe", age: 31 });
      */
     public async replaceOne(
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         replacement: ReplaceType<SchemaType>,
         options?: ReplaceOptions
     ): Promise<UpdateResult> {
@@ -1057,7 +1051,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     /**
      * Deletes a single document in the collection that matches the given filter criteria.
      *
-     * @param {FilterType<Type>} filter - The filter criteria to locate the document to delete.
+     * @param {Filter<Type>} filter - The filter criteria to locate the document to delete.
      * @param {DeleteOptions} options - Optional settings for the delete operation. Learn more at
      *                                  {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/DeleteOptions.html this}.
      *
@@ -1067,14 +1061,14 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * // Delete a user document from the collection.
      * const result = await UserModel.deleteOne({ name: "John Doe" });
      */
-    public async deleteOne(filter: FilterType<Type>, options?: DeleteOptions): Promise<DeleteResult> {
+    public async deleteOne(filter: Filter<Type>, options?: DeleteOptions): Promise<DeleteResult> {
         return this._delete("deleteOne", filter, options);
     }
 
     /**
      * Deletes multiple documents in the collection that match the given filter criteria.
      *
-     * @param {FilterType<Type>} filter - The filter criteria to locate the documents to delete.
+     * @param {Filter<Type>} filter - The filter criteria to locate the documents to delete.
      * @param {DeleteOptions} options - Optional settings for the delete operation. Learn more at
      *                                  {@link https://mongodb.github.io/node-mongodb-native/6.7/interfaces/DeleteOptions.html this}.
      *
@@ -1084,13 +1078,13 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * // Delete multiple user documents from the collection.
      * const result = await UserModel.deleteMany({ age: { $lt: 30 } });
      */
-    public async deleteMany(filter: FilterType<Type>, options?: DeleteOptions): Promise<DeleteResult> {
+    public async deleteMany(filter: Filter<Type>, options?: DeleteOptions): Promise<DeleteResult> {
         return this._delete("deleteMany", filter, options);
     }
 
     private async _delete(
         method: "deleteOne" | "deleteMany",
-        filter: FilterType<Type>,
+        filter: Filter<Type>,
         options?: DeleteOptions
     ): Promise<DeleteResult> {
         return this.collection[method](filter as Filter<Type>, options);
