@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type MongooatError from "./errors/mongooatError.js";
-import type { BulkWriteResult, CreateIndexesOptions, IndexDescription, IndexDirection } from "mongodb";
+import type { BulkWriteResult, CreateIndexesOptions, IndexDescription, IndexDirection, ObjectId } from "mongodb";
 import type { DEFAULT_PATH_OPTIONS, POSITIONAL_OPERATOR_MAP, WILDCARD_INDEX_MAP } from "./constants.js";
 
 /************************/
@@ -24,6 +24,14 @@ export type Flatten<Type> =
     | (NonNullable<Type> extends Array<infer Item> ? Flatten<Item> : Type)
     | HaveNullAndUndefined<Type>;
 
+export type AssignStringToObjectId<T> = T extends ObjectId
+    ? ObjectId | string
+    : T extends Array<infer U>
+    ? AssignStringToObjectId<U>[]
+    : T extends Record<string | number, unknown>
+    ? { [K in keyof T]: AssignStringToObjectId<T[K]> }
+    : T;
+
 /**
  * Represents a valid model type, requiring a valid `_id` field.
  * If the `_id` field is not defined or is invalid, this type resolves to `never`.
@@ -31,11 +39,13 @@ export type Flatten<Type> =
 export type ValidModelType<MT> = MT extends { _id?: any } ? (IdField<MT> extends never ? never : MT) : MT;
 
 /** Extract valid `_id` fields from model type */
-export type IdField<MT> = MT extends { _id?: any }
-    ? RemoveUndefined<MT["_id"]> extends NotArrayAndTuple
-        ? RemoveUndefined<MT["_id"]>
+export type IdField<MT> = AssignStringToObjectId<
+    MT extends { _id?: any }
+        ? RemoveUndefined<MT["_id"]> extends NotArrayAndTuple
+            ? RemoveUndefined<MT["_id"]>
+            : never
         : never
-    : never;
+>;
 
 /**
  * Ensures that the type is not an `array`, `tuple`, or an `unknown` type.
