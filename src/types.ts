@@ -39,13 +39,11 @@ export type AssignStringToObjectId<T> = T extends ObjectId
 export type ValidModelType<MT> = MT extends { _id?: any } ? (IdField<MT> extends never ? never : MT) : MT;
 
 /** Extract valid `_id` fields from model type */
-export type IdField<MT> = AssignStringToObjectId<
-    MT extends { _id?: any }
-        ? RemoveUndefined<MT["_id"]> extends NotArrayAndTuple
-            ? RemoveUndefined<MT["_id"]>
-            : never
+export type IdField<MT> = MT extends { _id?: any }
+    ? RemoveUndefined<MT["_id"]> extends NotArrayAndTuple
+        ? RemoveUndefined<MT["_id"]>
         : never
->;
+    : never;
 
 /**
  * Ensures that the type is not an `array`, `tuple`, or an `unknown` type.
