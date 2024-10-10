@@ -230,11 +230,19 @@ type InferShape<T extends z.ZodTypeAny> = T extends z.ZodObject<infer S extends 
     : T extends z.ZodArray<infer E>
     ? Array<E extends z.ZodObject<infer S extends z.ZodRawShape> ? OptionalDefaults<S> : z.infer<E>>
     : z.infer<T>;
+type test = {
+    password: z.ZodEffects<z.ZodDefault<z.ZodString>, string, string | undefined>;
+    test: z.ZodDefault<z.ZodString>;
+};
+
+type sadf = InferShape<z.ZodObject<test>>;
+
+const sdf: sadf = {};
 
 export type OptionalDefaults<T extends z.ZodRawShape> = {
-    [K in keyof T as T[K] extends z.ZodDefault<any> | z.ZodOptional<any> ? never : K]: InferShape<T[K]>;
+    [K in keyof T as UnwrapZodType<T[K]> extends z.ZodDefault<any> | z.ZodOptional<any> ? K : never]?: InferShape<T[K]>;
 } & {
-    [K in keyof T as T[K] extends z.ZodDefault<any> | z.ZodOptional<any> ? K : never]?: InferShape<T[K]>;
+    [K in keyof T as UnwrapZodType<T[K]> extends z.ZodDefault<any> | z.ZodOptional<any> ? never : K]: InferShape<T[K]>;
 };
 
 /**
@@ -265,10 +273,10 @@ type ValidIdZodType = z.ZodType<any> & {
 };
 
 /** Unwraps Zod types recursively. */
-export type UnwrapZodType<T extends z.ZodType> = T extends { unwrap: () => infer U }
-    ? U extends z.ZodType<any>
-        ? UnwrapZodType<U>
-        : U
+export type UnwrapZodType<T extends z.ZodType> = T extends { unwrap: () => infer U extends z.ZodType<any> }
+    ? UnwrapZodType<U>
+    : T extends { sourceType: () => infer U extends z.ZodType<any> }
+    ? UnwrapZodType<U>
     : T;
 
 /************************/
