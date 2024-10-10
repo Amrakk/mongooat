@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import type { z, ZodString } from "zod";
 import type MongooatError from "./errors/mongooatError.js";
 import type { BulkWriteResult, CreateIndexesOptions, IndexDescription, IndexDirection, ObjectId } from "mongodb";
 import type { DEFAULT_PATH_OPTIONS, POSITIONAL_OPERATOR_MAP, WILDCARD_INDEX_MAP } from "./constants.js";
@@ -239,9 +239,9 @@ export type OptionalDefaults<T extends z.ZodRawShape> = {
 };
 
 type ShouldAssignOptional<T extends z.ZodRawShape, K extends keyof T> = UnwrapZodType<T[K]> extends z.ZodDefault<any>
-    ? T extends z.ZodOptional<any>
-        ? never
-        : K
+    ? K
+    : HaveUndefined<z.infer<T[K]>> extends true
+    ? K
     : never;
 
 /**
