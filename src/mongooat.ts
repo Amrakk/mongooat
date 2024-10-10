@@ -114,6 +114,11 @@ class Mongooat {
         return await this._currDb.createCollection<Type>(name, options);
     }
 
+    /** Connect to MongoDB server. */
+    public async connect(): Promise<void> {
+        await this._base.connect();
+    }
+
     /** Close the connection to the MongoDB server. */
     public async close(force?: boolean): Promise<void> {
         return this._base.close(force);
