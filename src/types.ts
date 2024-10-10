@@ -230,20 +230,19 @@ type InferShape<T extends z.ZodTypeAny> = T extends z.ZodObject<infer S extends 
     : T extends z.ZodArray<infer E>
     ? Array<E extends z.ZodObject<infer S extends z.ZodRawShape> ? OptionalDefaults<S> : z.infer<E>>
     : z.infer<T>;
-type test = {
-    password: z.ZodEffects<z.ZodDefault<z.ZodString>, string, string | undefined>;
-    test: z.ZodDefault<z.ZodString>;
-};
 
-type sadf = InferShape<z.ZodObject<test>>;
-
-const sdf: sadf = {};
-
+/** Assigns optional for keys wrapped with ZodDefault */
 export type OptionalDefaults<T extends z.ZodRawShape> = {
-    [K in keyof T as UnwrapZodType<T[K]> extends z.ZodDefault<any> | z.ZodOptional<any> ? K : never]?: InferShape<T[K]>;
+    [K in keyof T as ShouldAssignOptional<T, K>]?: InferShape<T[K]>;
 } & {
-    [K in keyof T as UnwrapZodType<T[K]> extends z.ZodDefault<any> | z.ZodOptional<any> ? never : K]: InferShape<T[K]>;
+    [K in keyof T as ShouldAssignOptional<T, K> extends never ? K : never]: InferShape<T[K]>;
 };
+
+type ShouldAssignOptional<T extends z.ZodRawShape, K extends keyof T> = UnwrapZodType<T[K]> extends z.ZodDefault<any>
+    ? T extends z.ZodOptional<any>
+        ? never
+        : K
+    : never;
 
 /**
  * Ensures that the `_id` field is not an `array`, `tuple`, `undefined` or `unknown` type.
