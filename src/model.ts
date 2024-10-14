@@ -1,3 +1,5 @@
+import { ObjectId } from "mongodb";
+import { ZodObjectId } from "./schemas/objectId.js";
 import { deleteField } from "./helpers/deleteField.js";
 import { DEFAULT_ARRAY_PLACEHOLDER } from "./constants.js";
 import { validateSchema } from "./helpers/validateSchema.js";
@@ -9,8 +11,8 @@ import ValidateError from "./errors/validateError.js";
 import MissingModelNameError from "./errors/model/missingModelName.js";
 import IdFieldNotAllowedError from "./errors/model/idFieldNotAllowed.js";
 
-import type { ParseOptions } from "./options/parseOptions.js";
 import type { ZodObject, ZodRawShape } from "zod";
+import type { ParseOptions } from "./options/parseOptions.js";
 import type {
     OmitId,
     IdField,
@@ -24,43 +26,42 @@ import type {
     MGIndexDescription,
     MGIndexSpecification,
     MGCreateIndexesOptions,
+    AssignStringToObjectId,
 } from "./types.js";
-import {
-    type Db,
-    type BSON,
-    type Filter,
-    type WithId,
-    type Collection,
-    type FindOptions,
-    type DeleteResult,
-    type ModifyResult,
-    type UpdateFilter,
-    type UpdateResult,
-    type DeleteOptions,
-    type UpdateOptions,
-    type ReplaceOptions,
-    type DistinctOptions,
-    type AggregateOptions,
-    type BulkWriteOptions,
-    type IndexDescription,
-    type InsertOneOptions,
-    type AggregationCursor,
-    type ListIndexesCursor,
-    type DropIndexesOptions,
-    type IndexSpecification,
-    type ListIndexesOptions,
-    type AnyBulkWriteOperation,
-    type CountDocumentsOptions,
-    type SearchIndexDescription,
-    type FindOneAndUpdateOptions,
-    type FindOneAndDeleteOptions,
-    type ListSearchIndexesCursor,
-    type FindOneAndReplaceOptions,
-    type ListSearchIndexesOptions,
-    type OptionalUnlessRequiredId,
-    ObjectId,
+import type {
+    Db,
+    BSON,
+    Filter,
+    WithId,
+    Collection,
+    FindOptions,
+    DeleteResult,
+    ModifyResult,
+    UpdateFilter,
+    UpdateResult,
+    DeleteOptions,
+    UpdateOptions,
+    ReplaceOptions,
+    DistinctOptions,
+    AggregateOptions,
+    BulkWriteOptions,
+    IndexDescription,
+    InsertOneOptions,
+    AggregationCursor,
+    ListIndexesCursor,
+    DropIndexesOptions,
+    IndexSpecification,
+    ListIndexesOptions,
+    AnyBulkWriteOperation,
+    CountDocumentsOptions,
+    SearchIndexDescription,
+    FindOneAndUpdateOptions,
+    FindOneAndDeleteOptions,
+    ListSearchIndexesCursor,
+    FindOneAndReplaceOptions,
+    ListSearchIndexesOptions,
+    OptionalUnlessRequiredId,
 } from "mongodb";
-import { ZodObjectId } from "./schemas/objectid.js";
 
 /** Extracts the type of a model instance. */
 export type TypeOf<T extends Model<any, any>> = T["_type"];
@@ -69,13 +70,13 @@ export type TypeOf<T extends Model<any, any>> = T["_type"];
 export type GetPaths<T extends Model<any, any>> = T["_paths"];
 
 /** Update type for a model instance. */
-export type UpdateType<T> = DeepPartial<OmitId<T>>;
+export type UpdateType<T> = DeepPartial<AssignStringToObjectId<OmitId<T>>>;
 
 /** Insert type for a model instance */
-export type InsertType<T extends ZodRawShape> = OptionalUnlessRequiredId<OptionalDefaults<T>>;
+export type InsertType<T extends ZodRawShape> = AssignStringToObjectId<OptionalUnlessRequiredId<OptionalDefaults<T>>>;
 
 /** Replace type for a model instance */
-export type ReplaceType<T extends ZodRawShape> = OmitId<OptionalDefaults<T>>;
+export type ReplaceType<T extends ZodRawShape> = AssignStringToObjectId<OmitId<OptionalDefaults<T>>>;
 
 /**
  * Represents a model that maps to a MongoDB collection and defines the structure of documents within that collection
@@ -242,7 +243,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * @returns {Promise<number>} A promise that resolves to the number of documents matching the criteria.
      */
     public countDocuments(filter?: Filter<Type>, options?: CountDocumentsOptions): Promise<number> {
-        return this.collection.countDocuments(filter, options);
+        return this.collection.countDocuments(filter as Filter<Type>, options);
     }
 
     /**
@@ -285,7 +286,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         options?: DistinctOptions
     ): Promise<Flatten<ResolvePath<Type, Key>>[]> {
         const fixedKey = (key as string).replaceAll(`.${DEFAULT_ARRAY_PLACEHOLDER}`, "");
-        return this.collection.distinct(fixedKey, filter ?? {}, options ?? {}) as Promise<
+        return this.collection.distinct(fixedKey, (filter ?? {}) as Filter<Type>, options ?? {}) as Promise<
             Flatten<ResolvePath<Type, Key>>[]
         >;
     }
@@ -570,7 +571,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
      * const user = await UserModel.findById(new ObjectId("64b175497dc71570edd625d2"));
      */
     public async findById(id: IdField<Type>, options?: FindOptions): Promise<Type | null> {
-        return this.findOne({ _id: id }, options);
+        return this.findOne({ _id: id } as Filter<Type>, options);
     }
 
     /**
@@ -611,8 +612,8 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         update: UpdateType<Type>,
         options?: FindOneAndUpdateOptions
     ): Promise<ModifyResult<Type> | Type | null> {
-        if (!options) return this.findOneAndUpdate({ _id: id }, update);
-        else return this.findOneAndUpdate({ _id: id }, update, options);
+        if (!options) return this.findOneAndUpdate({ _id: id } as Filter<Type>, update);
+        else return this.findOneAndUpdate({ _id: id } as Filter<Type>, update, options);
     }
 
     /**
@@ -650,8 +651,8 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         replacement: ReplaceType<SchemaType>,
         options?: FindOneAndReplaceOptions
     ): Promise<ModifyResult<Type> | Type | null> {
-        if (!options) return this.findOneAndReplace({ _id: id }, replacement);
-        else return this.findOneAndReplace({ _id: id }, replacement, options);
+        if (!options) return this.findOneAndReplace({ _id: id } as Filter<Type>, replacement);
+        else return this.findOneAndReplace({ _id: id } as Filter<Type>, replacement, options);
     }
 
     /**
@@ -681,8 +682,8 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         id: IdField<Type>,
         options?: FindOneAndDeleteOptions
     ): Promise<ModifyResult<Type> | Type | null> {
-        if (!options) return this.findOneAndDelete({ _id: id });
-        else return this.findOneAndDelete({ _id: id }, options);
+        if (!options) return this.findOneAndDelete({ _id: id } as Filter<Type>);
+        else return this.findOneAndDelete({ _id: id } as Filter<Type>, options);
     }
 
     /**
@@ -741,22 +742,22 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         options?: FindOneAndUpdateOptions
     ): Promise<ModifyResult<Type> | Type | null> {
         if (update.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
-        await this.parse(update, { isPartial: true });
+        const updateData = await this.parse(update, { isPartial: true });
 
-        const { set, unset } = processUndefinedFieldsForUpdate(update);
+        const { set, unset } = processUndefinedFieldsForUpdate(updateData);
         const updateFilter = { $set: set as Partial<Type>, $unset: unset } as UpdateFilter<Type>;
 
         let res;
         if (options) {
             if (options.includeResultMetadata)
                 return this.collection.findOneAndUpdate(
-                    filter,
+                    filter as Filter<Type>,
                     updateFilter,
                     options as FindOneAndUpdateOptions & { includeResultMetadata: true }
                 );
 
-            res = this.collection.findOneAndUpdate(filter, updateFilter, options);
-        } else res = this.collection.findOneAndUpdate(filter, updateFilter);
+            res = this.collection.findOneAndUpdate(filter as Filter<Type>, updateFilter, options);
+        } else res = this.collection.findOneAndUpdate(filter as Filter<Type>, updateFilter);
 
         return res.then((doc) => doc as Type | null);
     }
@@ -798,25 +799,22 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     ): Promise<ModifyResult<Type> | Type | null> {
         if (replacement.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
         const replaceData = removeUndefinedFields(
-            await this.parse(
-                replacement,
-                this.schema.shape.hasOwnProperty("_id")
-                    ? { partialFields: ["_id"] as ObjectKeyPaths<Type>[] }
-                    : undefined
-            )
+            await this.parse(replacement as Record<string | number, unknown>, {
+                partialFields: ["_id"] as ObjectKeyPaths<Type>[],
+            })
         ) as OmitId<Type>;
 
         let res;
         if (options) {
             if (options.includeResultMetadata)
                 return this.collection.findOneAndReplace(
-                    filter,
+                    filter as Filter<Type>,
                     replaceData,
                     options as FindOneAndUpdateOptions & { includeResultMetadata: true }
                 );
 
-            res = this.collection.findOneAndReplace(filter, replaceData, options);
-        } else res = this.collection.findOneAndReplace(filter, replaceData);
+            res = this.collection.findOneAndReplace(filter as Filter<Type>, replaceData, options);
+        } else res = this.collection.findOneAndReplace(filter as Filter<Type>, replaceData);
 
         return res.then((doc) => doc as Type | null);
     }
@@ -852,12 +850,12 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         if (options) {
             if (options.includeResultMetadata)
                 return this.collection.findOneAndDelete(
-                    filter,
+                    filter as Filter<Type>,
                     options as FindOneAndDeleteOptions & { includeResultMetadata: true }
                 );
 
-            res = this.collection.findOneAndDelete(filter, options);
-        } else res = this.collection.findOneAndDelete(filter);
+            res = this.collection.findOneAndDelete(filter as Filter<Type>, options);
+        } else res = this.collection.findOneAndDelete(filter as Filter<Type>);
 
         return res.then((doc) => doc as Type | null);
     }
@@ -870,12 +868,12 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         const isCheckOnGet = this.checkOnGet;
 
         if (method === "find") {
-            const docs = await this.collection.find(filter, options).toArray();
+            const docs = await this.collection.find(filter as Filter<Type>, options).toArray();
             return (
                 isCheckOnGet ? await Promise.all(docs.map((doc) => this.parse(doc, { isStrict: false }))) : docs
             ) as Type[];
         } else {
-            const doc = await this.collection.findOne<Type>(filter, options);
+            const doc = await this.collection.findOne<Type>(filter as Filter<Type>, options);
             return isCheckOnGet && doc ? await this.parse(doc, { isStrict: false }) : doc;
         }
     }
@@ -923,7 +921,9 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     ): Promise<Type | Type[]> {
         if (Array.isArray(data)) {
             const insertData = await Promise.all(
-                data.map(async (doc) => removeUndefinedFields((await this.parse(doc)) as Type))
+                data.map(async (doc) =>
+                    removeUndefinedFields((await this.parse(doc as Record<string | number, unknown>)) as Type)
+                )
             );
 
             const result = await this.collection.insertMany(
@@ -937,7 +937,9 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
 
             return insertData;
         } else {
-            const insertData = removeUndefinedFields(await this.parse(data)) as Type;
+            const insertData = removeUndefinedFields(
+                await this.parse(data as Record<string | number, unknown>)
+            ) as Type;
             const result = await this.collection.insertOne(
                 insertData as OptionalUnlessRequiredId<Type>,
                 options as InsertOneOptions
@@ -1005,12 +1007,11 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         options?: UpdateOptions
     ): Promise<UpdateResult> {
         if (update.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
-        await this.parse(update, { isPartial: true });
+        const updateData = await this.parse(update, { isPartial: true });
 
-        const { set, unset } = processUndefinedFieldsForUpdate(update);
-
+        const { set, unset } = processUndefinedFieldsForUpdate(updateData);
         return this.collection[method](
-            filter,
+            filter as Filter<Type>,
             { $set: set as Partial<Type>, $unset: unset } as UpdateFilter<Type>,
             options
         );
@@ -1038,15 +1039,12 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     ): Promise<UpdateResult> {
         if (replacement.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
         const replaceData = removeUndefinedFields(
-            await this.parse(
-                replacement,
-                this.schema.shape.hasOwnProperty("_id")
-                    ? { partialFields: ["_id"] as ObjectKeyPaths<Type>[] }
-                    : undefined
-            )
+            await this.parse(replacement as Record<string | number, unknown>, {
+                partialFields: ["_id"] as ObjectKeyPaths<Type>[],
+            })
         ) as OmitId<Type>;
 
-        return this.collection.replaceOne(filter, replaceData, options) as Promise<UpdateResult>;
+        return this.collection.replaceOne(filter as Filter<Type>, replaceData, options) as Promise<UpdateResult>;
     }
 
     /**
@@ -1088,6 +1086,6 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         filter: Filter<Type>,
         options?: DeleteOptions
     ): Promise<DeleteResult> {
-        return this.collection[method](filter, options);
+        return this.collection[method](filter as Filter<Type>, options);
     }
 }

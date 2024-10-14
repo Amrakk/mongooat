@@ -1,6 +1,6 @@
-import type { z } from "zod";
+import type { z, ZodString } from "zod";
 import type MongooatError from "./errors/mongooatError.js";
-import type { BulkWriteResult, CreateIndexesOptions, IndexDescription, IndexDirection } from "mongodb";
+import type { BulkWriteResult, CreateIndexesOptions, IndexDescription, IndexDirection, ObjectId } from "mongodb";
 import type { DEFAULT_PATH_OPTIONS, POSITIONAL_OPERATOR_MAP, WILDCARD_INDEX_MAP } from "./constants.js";
 
 /************************/
@@ -23,6 +23,14 @@ type IsArray<T> = T extends Array<any> ? (T extends any[] ? (T extends [any, ...
 export type Flatten<Type> =
     | (NonNullable<Type> extends Array<infer Item> ? Flatten<Item> : Type)
     | HaveNullAndUndefined<Type>;
+
+export type AssignStringToObjectId<T> = T extends ObjectId
+    ? ObjectId | string
+    : T extends Array<infer U>
+    ? AssignStringToObjectId<U>[]
+    : T extends Record<string | number, unknown>
+    ? { [K in keyof T]: AssignStringToObjectId<T[K]> }
+    : T;
 
 /**
  * Represents a valid model type, requiring a valid `_id` field.
@@ -223,11 +231,18 @@ type InferShape<T extends z.ZodTypeAny> = T extends z.ZodObject<infer S extends 
     ? Array<E extends z.ZodObject<infer S extends z.ZodRawShape> ? OptionalDefaults<S> : z.infer<E>>
     : z.infer<T>;
 
+/** Assigns optional for keys wrapped with ZodDefault */
 export type OptionalDefaults<T extends z.ZodRawShape> = {
-    [K in keyof T as T[K] extends z.ZodDefault<any> | z.ZodOptional<any> ? never : K]: InferShape<T[K]>;
+    [K in keyof T as ShouldAssignOptional<T, K>]?: InferShape<T[K]>;
 } & {
-    [K in keyof T as T[K] extends z.ZodDefault<any> | z.ZodOptional<any> ? K : never]?: InferShape<T[K]>;
+    [K in keyof T as ShouldAssignOptional<T, K> extends never ? K : never]: InferShape<T[K]>;
 };
+
+type ShouldAssignOptional<T extends z.ZodRawShape, K extends keyof T> = UnwrapZodType<T[K]> extends z.ZodDefault<any>
+    ? K
+    : HaveUndefined<z.infer<T[K]>> extends true
+    ? K
+    : never;
 
 /**
  * Ensures that the `_id` field is not an `array`, `tuple`, `undefined` or `unknown` type.
@@ -257,10 +272,10 @@ type ValidIdZodType = z.ZodType<any> & {
 };
 
 /** Unwraps Zod types recursively. */
-export type UnwrapZodType<T extends z.ZodType> = T extends { unwrap: () => infer U }
-    ? U extends z.ZodType<any>
-        ? UnwrapZodType<U>
-        : U
+export type UnwrapZodType<T extends z.ZodType> = T extends { unwrap: () => infer U extends z.ZodType<any> }
+    ? UnwrapZodType<U>
+    : T extends { sourceType: () => infer U extends z.ZodType<any> }
+    ? UnwrapZodType<U>
     : T;
 
 /************************/
