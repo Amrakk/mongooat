@@ -742,9 +742,9 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         options?: FindOneAndUpdateOptions
     ): Promise<ModifyResult<Type> | Type | null> {
         if (update.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
-        await this.parse(update, { isPartial: true });
+        const updateData = await this.parse(update, { isPartial: true });
 
-        const { set, unset } = processUndefinedFieldsForUpdate(update);
+        const { set, unset } = processUndefinedFieldsForUpdate(updateData);
         const updateFilter = { $set: set as Partial<Type>, $unset: unset } as UpdateFilter<Type>;
 
         let res;
@@ -1007,10 +1007,9 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
         options?: UpdateOptions
     ): Promise<UpdateResult> {
         if (update.hasOwnProperty("_id")) throw new IdFieldNotAllowedError();
-        await this.parse(update, { isPartial: true });
+        const updateData = await this.parse(update, { isPartial: true });
 
-        const { set, unset } = processUndefinedFieldsForUpdate(update);
-
+        const { set, unset } = processUndefinedFieldsForUpdate(updateData);
         return this.collection[method](
             filter as Filter<Type>,
             { $set: set as Partial<Type>, $unset: unset } as UpdateFilter<Type>,
