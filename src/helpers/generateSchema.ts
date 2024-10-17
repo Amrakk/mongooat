@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z, ZodTypeAny } from "zod";
 import { deleteZodField } from "./deleteField.js";
 
 import type { ObjectKeyPaths } from "../types.js";
@@ -32,55 +32,23 @@ export function createSchemaFromData<ST extends z.ZodRawShape>(
     };
 
     const processFieldSchema = (schema: z.ZodTypeAny, data: any): z.ZodTypeAny => {
-        if (Array.isArray(data)) {
-            // Process the array like an object
-            return processComplexArraySchema(schema, data);
-        } else if (typeof data === "object" && data !== null) {
-            return processComplexSchema(schema, data);
-        }
-        return schema; // Return as is for primitive types
+        if (typeof data === "object" && data !== null) return processComplexSchema(schema, data);
+        return schema;
     };
 
-    const processComplexArraySchema = (schema: z.ZodTypeAny, data: any[]): z.ZodTypeAny => {
-        // Check if the schema is wrapped in optional, nullable, or default
-        let elementSchema = schema instanceof z.ZodArray ? schema.element : schema;
+    const processArraySchema = (schema: z.ZodArray<ZodTypeAny>, data: any[]): z.ZodTypeAny => {
+        const processedElementSchema = processSchema(schema.element, data[0]);
+        const arraySchema = z.array(processedElementSchema);
 
-        // Capture default value if applicable
-        let defaultValue: any = undefined;
-        if (elementSchema instanceof z.ZodDefault) {
-            defaultValue = elementSchema._def.defaultValue();
-            elementSchema = elementSchema.removeDefault(); // Unwrap
-        }
-
-        // Unwrap the schema if necessary
-        if (elementSchema instanceof z.ZodOptional) {
-            elementSchema = elementSchema.unwrap();
-        } else if (elementSchema instanceof z.ZodNullable) {
-            elementSchema = elementSchema.unwrap();
-        }
-
-        // Process the first element of the array as an object
-        const processedElementSchema = processSchema(elementSchema, data[0]);
-        const arraySchema = z.array(processedElementSchema); // Create array schema
-
-        // Apply default value if it exists
-        if (defaultValue !== undefined) {
-            return arraySchema.default([defaultValue]); // Return an array with the default value
-        }
-
-        return arraySchema; // Return the processed array schema
+        return arraySchema;
     };
 
     const processComplexSchema = (schema: z.ZodTypeAny, data: any): z.ZodTypeAny => {
-        if (schema instanceof z.ZodObject) {
-            return processSchema(schema, data);
-        } else if (schema instanceof z.ZodOptional) {
-            return processOptionalSchema(schema, data);
-        } else if (schema instanceof z.ZodNullable) {
-            return processNullableSchema(schema, data);
-        } else if (schema instanceof z.ZodDefault) {
-            return processDefaultSchema(schema, data);
-        }
+        if (schema instanceof z.ZodObject) return processSchema(schema, data);
+        else if (schema instanceof z.ZodArray) return processArraySchema(schema, data);
+        else if (schema instanceof z.ZodOptional) return processOptionalSchema(schema, data);
+        else if (schema instanceof z.ZodNullable) return processNullableSchema(schema, data);
+        else if (schema instanceof z.ZodDefault) return processDefaultSchema(schema, data);
 
         return schema;
     };

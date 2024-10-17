@@ -152,7 +152,7 @@ export class Model<Type extends WithId<Record<string | number, unknown>>, Schema
     ): Promise<Type & T>;
     public async parse<T extends Record<string | number, unknown>>(
         data: T,
-        option?: ParseOptions<Type>
+        option: ParseOptions<Type>
     ): Promise<DeepPartial<Type>>;
     public async parse<T extends Record<string | number, unknown>>(data: T): Promise<Type>;
     public async parse<T extends Record<string | number, unknown>>(
