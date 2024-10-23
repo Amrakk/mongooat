@@ -79,6 +79,11 @@ class Mongooat {
         this._currDb = this._base.db(dbName, options);
     }
 
+    /** Get base client */
+    public getBase(): MongoClient {
+        return this._base;
+    }
+
     /** Get the names of all databases on the MongoDB server. */
     public async getDbNames(): Promise<string[]> {
         return this._base
